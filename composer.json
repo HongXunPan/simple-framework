@@ -1,0 +1,23 @@
+{
+    "name": "hongxunpan/simple-framework",
+    "description": "core framework for simple-php by HongXunPan",
+    "type": "libary",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "HongXunPan\\Framework\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "HongXunPan",
+            "email": "me@kangxuanpeng.com"
+        }
+    ],
+    "require": {
+        "php": "^8.0.20",
+        "illuminate/container": "^9.52",
+        "opis/closure": "^3.6",
+        "symfony/var-dumper": "^6.0"
+    }
+}
