@@ -20,10 +20,13 @@ trait PathTrait
         $this->path->$name = $path;
     }
 
-    public function getPath($name): string
+    public function getPath($name, $path = ''): string
     {
         if (isset($this->path->$name)) {
-            return $this->path->$name;
+            if ($path && !str_ends_with(DIRECTORY_SEPARATOR, $path)) {
+                $path .= DIRECTORY_SEPARATOR;
+            }
+            return $this->path->$name . $path;
         }
         throw new Exception($name . ' not set');
     }
