@@ -6,7 +6,7 @@ use Throwable;
 
 class ErrorHandler
 {
-    public static function handle(Throwable $throwable)
+    public static function handle(Throwable $throwable): void
     {
         dd($throwable);
     }

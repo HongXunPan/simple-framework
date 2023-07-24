@@ -29,7 +29,7 @@ class RouteRegister
         $this->updateRoute();
     }
 
-    private function updateRoute()
+    private function updateRoute(): void
     {
         Route::setRouteList($this->route->uri, $this->route->toArray());
     }

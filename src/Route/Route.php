@@ -36,12 +36,12 @@ class Route extends SingletonAbstract
         return $instance->defaultGroup->$name(...$arguments);
     }
 
-    public static function setRouteList(string $uri, array $route)
+    public static function setRouteList(string $uri, array $route): void
     {
         self::getInstance()->routeList[$uri] = $route;
     }
 
-    public static function removeRoute(string $uri)
+    public static function removeRoute(string $uri): void
     {
         if (isset(self::getInstance()->routeList[$uri])) {
             unset(self::getInstance()->routeList[$uri]);
@@ -77,7 +77,7 @@ class Route extends SingletonAbstract
         return self::getInstance()->routeList[$uri] ?? null;
     }
 
-    public static function loadAllRouteByFile($path)
+    public static function loadAllRouteByFile($path): void
     {
         $files = glob($path . '/*.php');
         foreach ($files as $file) {
@@ -85,7 +85,7 @@ class Route extends SingletonAbstract
         }
     }
 
-    public static function cache($dir, $fileName = 'route.php')
+    public static function cache($dir, $fileName = 'route.php'): void
     {
         $routeList = self::getInstance()->routeList;
 
@@ -101,7 +101,7 @@ class Route extends SingletonAbstract
         file_put_contents($file, serialize($routeList));
     }
 
-    public static function loadCache($file)
+    public static function loadCache($file): void
     {
         $cache = unserialize(file_get_contents($file));
         self::getInstance()->routeList = $cache;

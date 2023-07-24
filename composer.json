@@ -6,7 +6,8 @@
     "autoload": {
         "psr-4": {
             "HongXunPan\\Framework\\": "src/"
-        }
+        },
+        "files": ["src/helpers.php"]
     },
     "authors": [
         {
