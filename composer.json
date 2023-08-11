@@ -20,6 +20,6 @@
         "illuminate/container": "^9.52",
         "opis/closure": "^3.6",
         "symfony/var-dumper": "^6.0",
-        "hongxunpan/php-tools": "^2.4"
+        "hongxunpan/php-tools": "dev-main"
     }
 }
