@@ -13,13 +13,11 @@ use Throwable;
 
 class Application extends Container
 {
-    use PathTrait;
+    use PathTrait, ConfigTrait;
 
-    private bool $isDebug;
+    public bool $isDebug;
     private bool $initialized = false;
-    /**
-     * @var ResponseContract
-     */
+    /** @var ResponseContract $response*/
     private mixed $response;
 
     public function run(Closure $closure): void
@@ -41,18 +39,9 @@ class Application extends Container
         }
         $this->setPath('base', $basePath);
         $this->isDebug = (bool)env('debug', false);
-        $this->setConfig();
+        $this->loadConfig($this);
         $this->initialized = true;
         return self::setInstance($this);
-    }
-
-    private function setConfig()
-    {
-        Config::getInstance()->setConfigPath($this->getPath('base', 'config'), $this->getPath('base', 'boostrap/cache'), !$this->isDebug);
-//        app()->singleton(ResponseContract::class, config('app.response_class', Response::class));
-        $res=app()->singleton(ResponseContract::class, config('app.response_class', Response::class));
-//        dd(1, $this->bindings, $res);
-//        app()->bind(ResponseContract::class, Response::class);
     }
 
     public function loadRoute(): void
@@ -78,7 +67,7 @@ class Application extends Container
     public function setResponse($content): static
     {
         if (!$content instanceof ResponseContract) {
-            $content = app(ResponseContract::class, [$content]);
+            $content = app(ResponseContract::class, compact('content'));
         }
         $this->response = $content;
         return $this;
