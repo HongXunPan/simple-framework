@@ -1,6 +1,7 @@
 <?php
 
 use HongXunPan\Framework\Core\Application;
+use HongXunPan\Tools\Config\Config;
 use HongXunPan\Tools\Env\Env;
 use Illuminate\Contracts\Container\BindingResolutionException;
 
@@ -33,6 +34,18 @@ if (!function_exists('app')) {
         function env($key, $default = null): bool|array|string|null
         {
             return Env::get($key, $default);
+        }
+    }
+
+    if (!function_exists('config')) {
+        /**
+         * @param string $key
+         * @param bool|array|string $default
+         * @return array|bool|mixed|string|null
+         */
+        function config(string $key, bool|array|string $default = ''): mixed
+        {
+            return Config::getInstance()->getConfig($key, $default);
         }
     }
 }
