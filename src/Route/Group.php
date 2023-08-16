@@ -6,6 +6,12 @@ use Closure;
 
 /**
  * @method RouteRegister get(string $uri, array|string|callable $callable)
+ * @method RouteRegister post(string $uri, array|string|callable $callable)
+ * @method RouteRegister put(string $uri, array|string|callable $callable)
+ * @method RouteRegister patch(string $uri, array|string|callable $callable)
+ * @method RouteRegister delete(string $uri, array|string|callable $callable)
+ * @method RouteRegister options(string $uri, array|string|callable $callable)
+ * @method RouteRegister any(string $uri, array|string|callable $callable)
  *
  * Created by PhpStorm At 2022/10/17 06:48.
  * Author: HongXunPan

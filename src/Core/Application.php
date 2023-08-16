@@ -18,11 +18,15 @@ class Application extends Container
     /** @var ResponseContract $response*/
     private mixed $response;
 
-    public function run(Closure $closure): void
+    public function run(Closure $closure, string $errHandlerClass = ''): void
     {
         try {
             $closure($this);
         } catch (Throwable $throwable) {
+            if ($errHandlerClass && class_exists($errHandlerClass)) {
+                call_user_func([$errHandlerClass, 'handle'], $throwable);
+                return;
+            }
             ErrorHandler::handle($throwable);
         }
     }
