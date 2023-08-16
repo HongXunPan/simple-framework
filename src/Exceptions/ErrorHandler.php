@@ -1,6 +1,6 @@
 <?php
 
-namespace HongXunPan\Framework\Response;
+namespace HongXunPan\Framework\Exceptions;
 
 use Throwable;
 

@@ -3,11 +3,9 @@
 namespace HongXunPan\Framework\Core;
 
 use Closure;
-use HongXunPan\Framework\Response\ErrorHandler;
-use HongXunPan\Framework\Response\Response;
+use HongXunPan\Framework\Exceptions\ErrorHandler;
 use HongXunPan\Framework\Response\ResponseContract;
 use HongXunPan\Framework\Route\Route;
-use HongXunPan\Tools\Config\Config;
 use Illuminate\Container\Container;
 use Throwable;
 
@@ -39,6 +37,13 @@ class Application extends Container
         }
         $this->setPath('base', $basePath);
         $this->isDebug = (bool)env('debug', false);
+        if ($this->isDebug) {
+            ini_set('display_errors', 'On');
+            error_reporting(E_ALL);
+        } else {
+            error_reporting(E_ERROR);
+            ini_set('display_errors', 'Off');
+        }
         $this->loadConfig($this);
         $this->initialized = true;
         return self::setInstance($this);
