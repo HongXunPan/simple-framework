@@ -2,6 +2,7 @@
 
 namespace HongXunPan\Framework\Core;
 
+use HongXunPan\DB\Mysql\Pdo\Pdo;
 use HongXunPan\Framework\Response\Response;
 use HongXunPan\Framework\Response\ResponseContract;
 use HongXunPan\Tools\Config\Config;
@@ -12,7 +13,7 @@ trait ConfigTrait
     {
         Config::getInstance()->setConfigPath(
             $app->getPath('base', 'config'),
-            $app->getPath('base', 'boostrap/cache'),
+            $app->getPath('base', 'bootstrap/cache'),
             !$app->isDebug
         );
         ini_set('date.timezone', config('app.timezone'));
@@ -40,6 +41,10 @@ trait ConfigTrait
     private function loadDB(): static
     {
         //database
+        $databases = config('database.mysql');
+        foreach ($databases as $name => $config) {
+            Pdo::setConfig($config, $name);
+        }
         return $this;
     }
 }
