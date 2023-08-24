@@ -38,7 +38,7 @@ class Request
             $this->headers = $request['headers'];
             $this->query = $request['get'];
             if (isset($this->headers['CONTENT_TYPE']) && $this->headers['CONTENT_TYPE'] == 'application/json') {
-                $this->request = json_decode($request['rawContent'], true);
+                $this->request = json_decode($request['rawContent'], true) ?? [];
             } else {
                 $this->request = $request['post'];
             }
@@ -56,7 +56,7 @@ class Request
         $this->headers = $this->getHeaders();
         $this->query = $_GET;
         if (isset($this->headers['CONTENT_TYPE']) && $this->headers['CONTENT_TYPE'] == 'application/json') {
-            $this->request = json_decode(file_get_contents('php://input'), true);
+            $this->request = json_decode(file_get_contents('php://input'), true) ?? [];
         } else {
             $this->request = $_POST;
         }
@@ -108,6 +108,11 @@ class Request
     public function get($param, $default = null)
     {
         return $this->query[$param] ?? $default;
+    }
+
+    public function post($param, $default = null)
+    {
+        return $this->request[$param] ?? $default;
     }
 
     public function input(string $key, $default = null)
