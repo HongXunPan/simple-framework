@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "383169618fca11ec148454978304eeee",
+    "content-hash": "83472343737476d2c4457ae44970133e",
     "packages": [
         {
             "name": "guzzlehttp/guzzle",
@@ -376,16 +376,16 @@
         },
         {
             "name": "hongxunpan/php-tools",
-            "version": "2.4.2",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/HongXunPan/php-tools.git",
-                "reference": "746adbb8306d0123f93f1d894494df6b55ec5cef"
+                "reference": "a303649deb735cf1e70c493aae5ccc310fc5dece"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/HongXunPan/php-tools/zipball/746adbb8306d0123f93f1d894494df6b55ec5cef",
-                "reference": "746adbb8306d0123f93f1d894494df6b55ec5cef",
+                "url": "https://api.github.com/repos/HongXunPan/php-tools/zipball/a303649deb735cf1e70c493aae5ccc310fc5dece",
+                "reference": "a303649deb735cf1e70c493aae5ccc310fc5dece",
                 "shasum": ""
             },
             "require": {
@@ -396,6 +396,7 @@
             "require-dev": {
                 "symfony/var-dumper": "^6.0"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -415,9 +416,9 @@
             "description": "common php tools and functions",
             "support": {
                 "issues": "https://github.com/HongXunPan/php-tools/issues",
-                "source": "https://github.com/HongXunPan/php-tools/tree/2.4.2"
+                "source": "https://github.com/HongXunPan/php-tools/tree/main"
             },
-            "time": "2023-09-23T09:43:21+00:00"
+            "time": "2023-09-23T10:50:04+00:00"
         },
         {
             "name": "illuminate/container",
@@ -1193,7 +1194,9 @@
     "packages-dev": [],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {
+        "hongxunpan/php-tools": 20
+    },
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
