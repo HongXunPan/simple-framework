@@ -27,7 +27,7 @@ class Request
     public int $startMemory;
     public string $requestId;
     public ?int $user_id = null;
-    public mixed $user;
+    public mixed $user = null;
 
     public function __construct($request = [])
     {
