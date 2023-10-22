@@ -13,6 +13,7 @@ namespace HongXunPan\Framework\Core;
 
 class Request
 {
+    use PropertyTrait;
     public array $query;
     public array $request;
     public array $cookie;
@@ -32,6 +33,9 @@ class Request
     public function __construct($request = [])
     {
         $this->requestId = date('md') . uniqid();
+        if (app()->isCli) {
+            $request = ['empty' => true];
+        }
         if (!empty($request)) {
             $this->server = $request['server'];
             $this->ip = $request['ip'];

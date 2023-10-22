@@ -14,6 +14,7 @@ class Application extends Container
     use PathTrait, ConfigTrait;
 
     public bool $isDebug;
+    public bool $isCli;
     private bool $initialized = false;
     /** @var ResponseContract $response*/
     private mixed $response;
@@ -41,6 +42,7 @@ class Application extends Container
         }
         $this->setPath('base', $basePath);
         $this->isDebug = (bool)env('debug', false);
+        $this->isCli = str_contains(php_sapi_name(), 'cli');
         if ($this->isDebug) {
             ini_set('display_errors', 'On');
             error_reporting(E_ALL);
