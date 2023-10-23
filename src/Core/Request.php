@@ -37,19 +37,19 @@ class Request
             $request = ['empty' => true];
         }
         if (!empty($request)) {
-            $this->server = $request['server'];
-            $this->ip = $request['ip'];
-            $this->headers = $request['headers'];
-            $this->query = $request['get'];
+            $this->server = $request['server'] ?? [];
+            $this->ip = $request['ip'] ?? '';
+            $this->headers = $request['headers'] ?? [];
+            $this->query = $request['get'] ?? [];
             if (isset($this->headers['CONTENT_TYPE']) && $this->headers['CONTENT_TYPE'] == 'application/json') {
                 $this->request = json_decode($request['rawContent'], true) ?? [];
             } else {
-                $this->request = $request['post'];
+                $this->request = $request['post'] ?? [];
             }
-            $this->cookie = $request['cookie'];
-            $this->files = $request['files'];
-            $this->uri = $request['server']['request_uri'];
-            $this->host = $request['headers']['host'];
+            $this->cookie = $request['cookie'] ?? [];
+            $this->files = $request['files'] ?? [];
+            $this->uri = $request['server']['request_uri'] ?? '';
+            $this->host = $request['headers']['host'] ?? '';
             $this->microTime = microtime(true);
             $this->startMemory = memory_get_usage();
             return;
