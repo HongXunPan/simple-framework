@@ -14,6 +14,7 @@ namespace HongXunPan\Framework\Core;
 class Request
 {
     use PropertyTrait;
+
     public array $query;
     public array $request;
     public array $cookie;
@@ -133,7 +134,7 @@ class Request
         return $this->commons[$key] ?? $default;
     }
 
-    public function all(array|string $keys = null): array
+    public function all(array|string $keys = null, $skipNull = false): array
     {
         $input = array_merge($this->query, $this->request, $this->commons);
 
@@ -143,6 +144,9 @@ class Request
         $results = [];
 
         foreach (is_array($keys) ? $keys : func_get_args() as $key) {
+            if ($skipNull && !isset($input[$key])) {
+                continue;
+            }
             $results = array_merge($results, [$key => $input[$key] ?? null]);
         }
         return $results;
