@@ -67,7 +67,7 @@ class Route extends SingletonAbstract
         ];
         $route = Route::getRouteByUri($request['uri']);
         if (!$route) {
-            throw new RouteException('not found', 404);
+            throw new RouteException('route: ' . $request['uri'] . 'not found', 404);
         }
         return (new RouteOne(...$route))->validate(...$request)->run();
     }
