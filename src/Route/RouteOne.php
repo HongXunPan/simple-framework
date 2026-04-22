@@ -10,7 +10,8 @@ class RouteOne
         public mixed        $action,
         public string       $name,
         public array        $middlewares = [],
-        public string|array $domain = ''
+        public string|array $domain = '',
+        public ?string      $permission_key = null,
     )
     {
     }

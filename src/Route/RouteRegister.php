@@ -45,20 +45,13 @@ class RouteRegister
         return null;
     }
 
-//    public function name(string $routeName): static
-//    {
-//        $this->route->name = $routeName;
-//        $this->updateRoute();
-//        return $this;
-//    }
-//
-//    public function domain(string|array $domain): static
-//    {
-//        $this->route->domain = $domain;
-//        $this->updateRoute();
-//        return $this;
-//    }
-//
+    public function permission(string $permissionKey): static
+    {
+        $this->route->permission_key = $permissionKey;
+        $this->updateRoute();
+        return $this;
+    }
+
     public function middlewares(array $middlewares): static
     {
         $this->route->middlewares = array_merge($this->route->middlewares, $middlewares);
