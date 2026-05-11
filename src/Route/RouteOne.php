@@ -12,6 +12,7 @@ class RouteOne
         public array        $middlewares = [],
         public string|array $domain = '',
         public ?string      $permission_key = null,
+        public ?bool        $skip_permission = false,
     )
     {
     }

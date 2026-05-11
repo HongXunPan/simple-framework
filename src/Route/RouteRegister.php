@@ -52,6 +52,13 @@ class RouteRegister
         return $this;
     }
 
+    public function skipPermission(): static
+    {
+        $this->route->skip_permission = true;
+        $this->updateRoute();
+        return $this;
+    }
+
     public function middlewares(array $middlewares): static
     {
         $this->route->middlewares = array_merge($this->route->middlewares, $middlewares);
