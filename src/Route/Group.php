@@ -59,7 +59,7 @@ class Group
         return new RouteRegister($method, $uri, $callable, $this->group->middlewares);
     }
 
-    public function group(array|Closure $options, Closure $callback = null): void
+    public function group(array|Closure $options, ?Closure $callback = null): void
     {
         if ($options instanceof Closure) {
             $callback = $options;

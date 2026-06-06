@@ -134,7 +134,7 @@ class Request
         return $this->commons[$key] ?? $default;
     }
 
-    public function all(array|string $keys = null, $skipNull = false): array
+    public function all(array|string|null $keys = null, $skipNull = false): array
     {
         $input = array_merge($this->query, $this->request, $this->commons);
 
