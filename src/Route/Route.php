@@ -4,7 +4,8 @@ namespace HongXunPan\Framework\Route;
 
 use Closure;
 use HongXunPan\Framework\Core\SingletonAbstract;
-use Opis\Closure\SerializableClosure;
+use function Opis\Closure\serialize as opis_serialize;
+use function Opis\Closure\unserialize as opis_unserialize;
 
 /**
  * @method static RouteRegister any(string $path, array|string|callable $action)
@@ -88,22 +89,16 @@ class Route extends SingletonAbstract
     public static function cache($dir, $fileName = 'route.php'): void
     {
         $routeList = self::getInstance()->routeList;
-
-        foreach ($routeList as &$route) {
-            if ($route['action'] instanceof Closure) {
-                $route['action'] = new SerializableClosure($route['action']);
-            }
-        }
         if (!file_exists($dir)) {
             mkdir($dir);
         }
         $file = $dir . '/' . $fileName;
-        file_put_contents($file, serialize($routeList));
+        file_put_contents($file, opis_serialize($routeList));
     }
 
     public static function loadCache($file): void
     {
-        $cache = unserialize(file_get_contents($file));
+        $cache = opis_unserialize(file_get_contents($file));
         self::getInstance()->routeList = $cache;
     }
 }
