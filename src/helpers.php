@@ -1,6 +1,8 @@
 <?php
 
 use HongXunPan\Framework\Core\Application;
+use HongXunPan\Framework\Event\Dispatch\Dispatcher;
+use HongXunPan\Framework\Event\Event;
 use HongXunPan\Tools\Config\Config;
 use HongXunPan\Tools\Env\Env;
 use Illuminate\Contracts\Container\BindingResolutionException;
@@ -46,5 +48,12 @@ if (!function_exists('config')) {
     function config(string $key, bool|array|string $default = ''): mixed
     {
         return Config::getInstance()->getConfig($key, $default);
+    }
+}
+
+if (!function_exists('event')) {
+    function event(Event $event): void
+    {
+        app(Dispatcher::class)->dispatch($event);
     }
 }
