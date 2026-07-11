@@ -11,5 +11,5 @@ interface Consumer
 
     public function acknowledge(Message $message): void;
 
-    public function fail(Message $message, string $failure): void;
+    public function fail(Message $message, Failure $failure): void;
 }

@@ -7,6 +7,7 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 use HongXunPan\Framework\Core\Application;
 use HongXunPan\Framework\Event\Bootstrap\EventBootstrapper;
 use HongXunPan\Framework\Event\Consumer\Consumer;
+use HongXunPan\Framework\Event\Consumer\Failure;
 use HongXunPan\Framework\Event\Consumer\Message;
 use HongXunPan\Framework\Event\Dispatch\Dispatcher;
 use HongXunPan\Framework\Event\Dispatch\Envelope;
@@ -126,7 +127,7 @@ final class SyncFakeConsumer implements Consumer
     {
     }
 
-    public function fail(Message $message, string $failure): void
+    public function fail(Message $message, Failure $failure): void
     {
     }
 }

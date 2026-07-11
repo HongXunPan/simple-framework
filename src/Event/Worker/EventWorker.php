@@ -6,12 +6,12 @@ namespace HongXunPan\Framework\Event\Worker;
 
 use DateTimeImmutable;
 use HongXunPan\Framework\Event\Consumer\Consumer;
+use HongXunPan\Framework\Event\Consumer\Failure;
 use HongXunPan\Framework\Event\Consumer\Message;
 use HongXunPan\Framework\Event\Dispatch\Envelope;
 use HongXunPan\Framework\Event\Exception\EventConsumeException;
 use HongXunPan\Framework\Event\Serialization\Serializer;
 use HongXunPan\Framework\Event\Validation\EventValidator;
-use JsonException;
 use Throwable;
 
 final readonly class EventWorker
@@ -24,9 +24,10 @@ final readonly class EventWorker
     ) {
     }
 
-    public function run(): never
+    /** @param callable(): bool $shouldStop */
+    public function run(callable $shouldStop): void
     {
-        while (true) {
+        while (!$shouldStop()) {
             $this->runOnce();
         }
     }
@@ -73,32 +74,18 @@ final readonly class EventWorker
     ): void {
         $this->consumer->fail(
             $message,
-            $this->failurePayload($message, $envelope, $result, $throwable),
-        );
-    }
-
-    private function failurePayload(
-        Message $message,
-        ?Envelope $envelope,
-        ?EnvelopeExecutionResult $result,
-        ?Throwable $throwable,
-    ): string {
-        try {
-            return json_encode([
-                'message_id' => $message->id,
-                'event_id' => $envelope?->eventId,
-                'event_class' => $envelope === null ? null : $envelope->event::class,
-                'event_version' => $envelope === null ? null : $this->events->versionOf($envelope->event::class),
-                'listener_total' => $envelope === null ? 0 : count($envelope->listeners),
-                'listeners' => $result?->toArray() ?? [],
-                'error_class' => $throwable === null ? null : $throwable::class,
-                'error_message' => $throwable === null
+            new Failure(
+                messageId: $message->id,
+                eventId: $envelope?->eventId,
+                eventClass: $envelope === null ? null : $envelope->event::class,
+                eventVersion: $envelope === null ? null : $this->events->versionOf($envelope->event::class),
+                listeners: $result?->listeners ?? [],
+                errorClass: $throwable === null ? null : $throwable::class,
+                errorMessage: $throwable === null
                     ? null
                     : $this->runner->sanitizeErrorMessage($throwable->getMessage()),
-                'failed_at' => (new DateTimeImmutable())->format('Y-m-d\TH:i:s.uP'),
-            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        } catch (JsonException $exception) {
-            throw new EventConsumeException('失败消息摘要编码失败', previous: $exception);
-        }
+                failedAt: new DateTimeImmutable(),
+            ),
+        );
     }
 }

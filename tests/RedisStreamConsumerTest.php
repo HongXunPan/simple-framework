@@ -231,6 +231,8 @@ $runWorker('listener 失败后继续执行并写入 failed stream', static funct
 
     try {
         event(new WorkerOccurred('partial-failed'));
+        $sourceEntries = $context['redis']->xRange($context['stream'], '-', '+');
+        $sourceMessageId = array_key_first($sourceEntries);
         $context['worker']->runOnce();
 
         $workerAssertSame(
@@ -244,6 +246,11 @@ $runWorker('listener 失败后继续执行并写入 failed stream', static funct
 
         $failedFields = array_values($failedEntries)[0] ?? [];
         $failure = json_decode($failedFields['failure'], true, flags: JSON_THROW_ON_ERROR);
+        $workerAssertSame(
+            $sourceMessageId,
+            $failure['message_id'],
+            '失败摘要未保存原始消息 ID',
+        );
         $workerAssertSame(3, $failure['listener_total'], '失败摘要 listener 总数错误');
         $workerAssertSame(
             [true, false, true],

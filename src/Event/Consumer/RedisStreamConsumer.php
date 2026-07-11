@@ -6,6 +6,7 @@ namespace HongXunPan\Framework\Event\Consumer;
 
 use HongXunPan\DB\Redis\Redis as RedisManager;
 use HongXunPan\Framework\Event\Exception\EventConsumeException;
+use JsonException;
 use Redis;
 use RedisException;
 use Throwable;
@@ -72,13 +73,15 @@ final class RedisStreamConsumer implements Consumer
         }
     }
 
-    public function fail(Message $message, string $failure): void
+    public function fail(Message $message, Failure $failure): void
     {
+        $failurePayload = $this->serializeFailure($failure);
+
         try {
             $failedId = $this->redis()->xAdd(
                 $this->failedStream,
                 '*',
-                [self::MESSAGE_FIELD => $message->body, self::FAILURE_FIELD => $failure],
+                [self::MESSAGE_FIELD => $message->body, self::FAILURE_FIELD => $failurePayload],
                 $this->failedMaxLength,
                 true,
             );
@@ -91,6 +94,21 @@ final class RedisStreamConsumer implements Consumer
         }
 
         $this->acknowledge($message);
+    }
+
+    private function serializeFailure(Failure $failure): string
+    {
+        try {
+            return json_encode(
+                $failure->toArray(),
+                JSON_THROW_ON_ERROR
+                | JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_INVALID_UTF8_SUBSTITUTE,
+            );
+        } catch (JsonException $exception) {
+            throw new EventConsumeException('失败消息摘要编码失败', previous: $exception);
+        }
     }
 
     private function ensureGroup(): void
