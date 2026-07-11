@@ -3,7 +3,6 @@
 namespace HongXunPan\Framework\Core;
 
 use Exception;
-use HongXunPan\DB\Mysql\Pdo\Pdo;
 use HongXunPan\Framework\Response\Response;
 use HongXunPan\Framework\Response\ResponseContract;
 use HongXunPan\Tools\Config\Config;
@@ -20,7 +19,6 @@ trait ConfigTrait
         ini_set('date.timezone', config('app.timezone'));
         return $this
             ->loadSingleton()
-            ->loadDB()
             ->loadBoot();
     }
 
@@ -36,16 +34,6 @@ trait ConfigTrait
             } else {
                 app()->singleton($key, $value);
             }
-        }
-        return $this;
-    }
-
-    private function loadDB(): static
-    {
-        //database
-        $databases = config('database.mysql');
-        foreach ($databases as $name => $config) {
-            Pdo::setConfig($config, $name);
         }
         return $this;
     }

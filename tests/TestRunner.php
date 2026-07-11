@@ -5,13 +5,12 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 use HongXunPan\Framework\Core\Application;
+use HongXunPan\Framework\Event\Bootstrap\EventBootstrapper;
 use HongXunPan\Framework\Event\Dispatch\Dispatcher;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
-use HongXunPan\Framework\Event\Listener\ListenerCaller;
-use HongXunPan\Framework\Event\Listener\ListenerMap;
-use HongXunPan\Framework\Event\Validation\ListenerValidator;
 use HongXunPan\Tools\Config\Config;
+use HongXunPan\Tools\Env\Env;
 
 final readonly class DemoOccurred implements Event
 {
@@ -71,23 +70,9 @@ final class MissingHandleListener
 {
 }
 
-final class UntypedListener
-{
-    public function handle($event): void
-    {
-    }
-}
-
 final class WrongEventListener
 {
     public function handle(OtherOccurred $event): void
-    {
-    }
-}
-
-final class BaseEventListener
-{
-    public function handle(Event $event): void
     {
     }
 }
@@ -103,23 +88,31 @@ final class InvalidReturnListener
 /**
  * @return array{Application, InvocationLog}
  */
-function resetApplication(): array
+function bootApplication(mixed $listeners = [], bool $withEventsConfig = true): array
 {
+    putenv('DEBUG=false');
+    $loaded = (new ReflectionClass(Env::class))->getProperty('loaded');
+    $loaded->setValue(null, true);
+
+    Config::$config = [
+        'app' => ['timezone' => 'Asia/Shanghai'],
+        'singleton' => [],
+        'boot' => [
+            [EventBootstrapper::class, 'boot'],
+        ],
+    ];
+    if ($withEventsConfig) {
+        Config::$config['events'] = ['listeners' => $listeners];
+    }
+
     $application = new Application();
     Application::setInstance($application);
+    $application->init('/tmp/simple-framework-event-tests');
 
     $log = new InvocationLog();
     $application->instance(InvocationLog::class, $log);
 
     return [$application, $log];
-}
-
-function makeDispatcher(array $listeners): Dispatcher
-{
-    return new Dispatcher(
-        new ListenerMap($listeners),
-        new ListenerCaller(new ListenerValidator()),
-    );
 }
 
 $failures = [];
@@ -162,50 +155,55 @@ $run = static function (string $name, callable $test) use (&$failures): void {
     }
 };
 
-$run('无事件配置时安全空运行', static function () use ($assertSame): void {
-    [, $log] = resetApplication();
-    Config::$config = [];
+$run('无事件配置时启动并安全空运行', static function () use ($assertSame): void {
+    [, $log] = bootApplication(withEventsConfig: false);
 
     event(new DemoOccurred('empty'));
 
     $assertSame([], $log->entries, '无配置时不应调用监听器');
 });
 
-$run('同步监听器按声明顺序并由容器解析', static function () use ($assertSame): void {
-    [, $log] = resetApplication();
-    $dispatcher = makeDispatcher([
+$run('启动时按配置顺序注册监听器', static function () use ($assertSame): void {
+    [, $log] = bootApplication([
         DemoOccurred::class => [FirstListener::class, SecondListener::class],
     ]);
 
-    $dispatcher->dispatch(new DemoOccurred('ordered'));
+    event(new DemoOccurred('ordered'));
 
     $assertSame(
         ['first:ordered', 'second:ordered'],
         $log->entries,
-        '同步监听器调用顺序错误',
+        '启动注册后的同步监听器顺序错误',
     );
 });
 
-$run('event helper 使用容器中的 Dispatcher', static function () use ($assertSame): void {
-    [$application, $log] = resetApplication();
-    $application->instance(Dispatcher::class, makeDispatcher([
-        DemoOccurred::class => [FirstListener::class],
-    ]));
+$run('Dispatcher 在进程内保持单例', static function () use ($assertSame): void {
+    bootApplication();
 
-    event(new DemoOccurred('helper'));
+    $assertSame(
+        app(Dispatcher::class),
+        app(Dispatcher::class),
+        'Dispatcher 未保持进程级单例',
+    );
+});
 
-    $assertSame(['first:helper'], $log->entries, 'event helper 未使用容器 Dispatcher');
+$run('Dispatcher addListener 可用于启动注册', static function () use ($assertSame): void {
+    [, $log] = bootApplication();
+    app(Dispatcher::class)->addListener(DemoOccurred::class, FirstListener::class);
+
+    event(new DemoOccurred('manual'));
+
+    $assertSame(['first:manual'], $log->entries, 'addListener 注册结果未被 dispatch 使用');
 });
 
 $run('同步异常原样传播并停止后续监听器', static function () use ($assertSame, $assertThrows): void {
-    [, $log] = resetApplication();
-    $dispatcher = makeDispatcher([
+    [, $log] = bootApplication([
         DemoOccurred::class => [FirstListener::class, ThrowingListener::class, SecondListener::class],
     ]);
 
     $throwable = $assertThrows(
         \RuntimeException::class,
-        static fn () => $dispatcher->dispatch(new DemoOccurred('failed')),
+        static fn () => event(new DemoOccurred('failed')),
         '同步监听器异常未向上传播',
     );
 
@@ -217,35 +215,39 @@ $run('同步异常原样传播并停止后续监听器', static function () use 
     );
 });
 
-$run('非法监听器签名快速失败', static function () use ($assertThrows): void {
-    resetApplication();
-    $validator = new ListenerValidator();
-
-    foreach ([
-        MissingHandleListener::class,
-        UntypedListener::class,
-        WrongEventListener::class,
-        BaseEventListener::class,
-        InvalidReturnListener::class,
-    ] as $listenerClass) {
+$run('非法监听器在启动时失败', static function () use ($assertThrows): void {
+    foreach ([MissingHandleListener::class, WrongEventListener::class, InvalidReturnListener::class] as $listener) {
         $assertThrows(
             EventConfigException::class,
-            static fn () => $validator->validate($listenerClass, DemoOccurred::class),
-            '非法监听器签名未被拒绝：' . $listenerClass,
+            static fn () => bootApplication([DemoOccurred::class => [$listener]]),
+            '非法监听器未在启动时失败：' . $listener,
         );
     }
 });
 
-$run('非法监听器映射快速失败', static function () use ($assertThrows): void {
-    resetApplication();
-    $map = new ListenerMap([
-        DemoOccurred::class => [''],
-    ]);
-
+$run('非法事件类在启动时失败', static function () use ($assertThrows): void {
     $assertThrows(
         EventConfigException::class,
-        static fn () => $map->listenersFor(new DemoOccurred('invalid-map')),
-        '空监听器类名未被拒绝',
+        static fn () => bootApplication([\stdClass::class => [FirstListener::class]]),
+        '未实现 Event 的类未在启动时失败',
+    );
+});
+
+$run('重复监听器在启动时失败', static function () use ($assertThrows): void {
+    $assertThrows(
+        EventConfigException::class,
+        static fn () => bootApplication([
+            DemoOccurred::class => [FirstListener::class, FirstListener::class],
+        ]),
+        '重复监听器未在启动时失败',
+    );
+});
+
+$run('非法监听器配置结构在启动时失败', static function () use ($assertThrows): void {
+    $assertThrows(
+        EventConfigException::class,
+        static fn () => bootApplication('invalid-listeners'),
+        '非法监听器配置结构未在启动时失败',
     );
 });
 
@@ -257,4 +259,4 @@ if ($failures !== []) {
     exit(1);
 }
 
-echo '同步 Event 内核测试通过。' . PHP_EOL;
+echo '同步 Event 启动注册与分发测试通过。' . PHP_EOL;
