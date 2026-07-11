@@ -9,6 +9,9 @@ use HongXunPan\Framework\Event\Dispatch\Envelope;
 
 interface Driver
 {
+    /** @param array<mixed> $config */
+    public static function validateConfig(array $config): void;
+
     /** @return class-string<Consumer> */
     public static function consumer(): string;
 

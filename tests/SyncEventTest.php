@@ -100,6 +100,10 @@ final class FakeDriver implements Driver
     /** @var list<Envelope> */
     public array $envelopes = [];
 
+    public static function validateConfig(array $config): void
+    {
+    }
+
     public static function consumer(): string
     {
         return SyncFakeConsumer::class;
@@ -129,9 +133,30 @@ final class SyncFakeConsumer implements Consumer
 
 final class InvalidConsumerDriver implements Driver
 {
+    public static function validateConfig(array $config): void
+    {
+    }
+
     public static function consumer(): string
     {
         return InvalidDriver::class;
+    }
+
+    public function publish(Envelope $envelope): void
+    {
+    }
+}
+
+final class RejectingConfigDriver implements Driver
+{
+    public static function validateConfig(array $config): void
+    {
+        throw new EventConfigException('Fake Driver 配置无效');
+    }
+
+    public static function consumer(): string
+    {
+        return SyncFakeConsumer::class;
     }
 
     public function publish(Envelope $envelope): void
@@ -431,6 +456,18 @@ $run('Driver 声明非法 Consumer 时启动失败', static function () use ($as
         static fn () => bootApplication(driverClass: InvalidConsumerDriver::class),
         'Driver 返回非 Consumer 类时未在启动期失败',
     );
+});
+
+$run('Driver 配置校验失败时启动失败', static function () use ($assertThrows): void {
+    $throwable = $assertThrows(
+        EventConfigException::class,
+        static fn () => bootApplication(driverClass: RejectingConfigDriver::class),
+        'Driver 自身配置校验未在启动期执行',
+    );
+
+    if ($throwable->getMessage() !== 'Fake Driver 配置无效') {
+        throw new \RuntimeException('Driver 配置异常被通用校验器错误改写');
+    }
 });
 
 $run('显式空 Driver 配置时启动失败', static function () use ($assertThrows): void {

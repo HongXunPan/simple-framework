@@ -7,6 +7,7 @@ namespace HongXunPan\Framework\Event\Driver;
 use HongXunPan\DB\Redis\Redis as RedisManager;
 use HongXunPan\Framework\Event\Consumer\RedisStreamConsumer;
 use HongXunPan\Framework\Event\Dispatch\Envelope;
+use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Exception\EventPublishException;
 use HongXunPan\Framework\Event\Serialization\Serializer;
 use Throwable;
@@ -17,6 +18,40 @@ final readonly class RedisStreamDriver implements Driver
 
     public function __construct(private Serializer $serializer)
     {
+    }
+
+    public static function validateConfig(array $config): void
+    {
+        $connection = self::nonEmptyString($config, 'connection');
+        $stream = self::nonEmptyString($config, 'stream');
+        $failedStream = self::nonEmptyString($config, 'failed_stream');
+        self::nonEmptyString($config, 'group');
+
+        foreach (['block_ms', 'batch_size', 'claim_idle_ms', 'failed_max_length'] as $key) {
+            self::positiveInt($config, $key);
+        }
+
+        if ($stream === $failedStream) {
+            throw new EventConfigException('events.driver.stream 与 failed_stream 不能相同');
+        }
+
+        $redisConnections = config('database.redis', []);
+        if (!is_array($redisConnections) || !isset($redisConnections[$connection])
+            || !is_array($redisConnections[$connection])) {
+            throw new EventConfigException(
+                "events.driver.connection 未对应有效的 database.redis 配置：{$connection}",
+            );
+        }
+
+        $requiredMethods = ['xAdd', 'xGroup', 'xReadGroup', 'xAutoClaim', 'xAck', 'xDel'];
+        if (!extension_loaded('redis') || !class_exists(\Redis::class)) {
+            throw new EventConfigException('RedisStreamDriver 需要 phpredis 扩展');
+        }
+        foreach ($requiredMethods as $method) {
+            if (!method_exists(\Redis::class, $method)) {
+                throw new EventConfigException("RedisStreamDriver 需要 phpredis::{$method}()");
+            }
+        }
     }
 
     public static function consumer(): string
@@ -56,5 +91,27 @@ final readonly class RedisStreamDriver implements Driver
                 "Redis Stream 未返回有效消息 ID：{$envelope->eventId}",
             );
         }
+    }
+
+    /** @param array<mixed> $config */
+    private static function nonEmptyString(array $config, string $key): string
+    {
+        $value = $config[$key] ?? null;
+        if (!is_string($value) || $value === '') {
+            throw new EventConfigException("events.driver.{$key} 必须是非空字符串");
+        }
+
+        return $value;
+    }
+
+    /** @param array<mixed> $config */
+    private static function positiveInt(array $config, string $key): int
+    {
+        $value = $config[$key] ?? null;
+        if (!is_int($value) || $value < 1) {
+            throw new EventConfigException("events.driver.{$key} 必须是正整数");
+        }
+
+        return $value;
     }
 }
