@@ -7,8 +7,11 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 use HongXunPan\Framework\Core\Application;
 use HongXunPan\Framework\Event\Bootstrap\EventBootstrapper;
 use HongXunPan\Framework\Event\Dispatch\Dispatcher;
+use HongXunPan\Framework\Event\Dispatch\Envelope;
+use HongXunPan\Framework\Event\Driver\Driver;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
+use HongXunPan\Framework\Event\Listener\ShouldQueue;
 use HongXunPan\Tools\Config\Config;
 use HongXunPan\Tools\Env\Env;
 
@@ -66,6 +69,45 @@ final readonly class ThrowingListener
     }
 }
 
+final readonly class FirstQueuedListener implements ShouldQueue
+{
+    public function __construct(private InvocationLog $log)
+    {
+    }
+
+    public function handle(DemoOccurred $event): void
+    {
+        $this->log->entries[] = 'queued-first:' . $event->name;
+    }
+}
+
+final readonly class SecondQueuedListener implements ShouldQueue
+{
+    public function __construct(private InvocationLog $log)
+    {
+    }
+
+    public function handle(DemoOccurred $event): void
+    {
+        $this->log->entries[] = 'queued-second:' . $event->name;
+    }
+}
+
+final class FakeDriver implements Driver
+{
+    /** @var list<Envelope> */
+    public array $envelopes = [];
+
+    public function publish(Envelope $envelope): void
+    {
+        $this->envelopes[] = $envelope;
+    }
+}
+
+final class InvalidDriver
+{
+}
+
 final class MissingHandleListener
 {
 }
@@ -88,7 +130,11 @@ final class InvalidReturnListener
 /**
  * @return array{Application, InvocationLog}
  */
-function bootApplication(mixed $listeners = [], bool $withEventsConfig = true): array
+function bootApplication(
+    mixed $listeners = [],
+    bool $withEventsConfig = true,
+    mixed $driverClass = null,
+): array
 {
     putenv('DEBUG=false');
     $loaded = (new ReflectionClass(Env::class))->getProperty('loaded');
@@ -103,6 +149,9 @@ function bootApplication(mixed $listeners = [], bool $withEventsConfig = true): 
     ];
     if ($withEventsConfig) {
         Config::$config['events'] = ['listeners' => $listeners];
+        if ($driverClass !== null) {
+            Config::$config['events']['driver'] = ['class' => $driverClass];
+        }
     }
 
     $application = new Application();
@@ -196,6 +245,30 @@ $run('Dispatcher addListener 可用于启动注册', static function () use ($as
     $assertSame(['first:manual'], $log->entries, 'addListener 注册结果未被 dispatch 使用');
 });
 
+$run('手动注册异步监听器时复用已配置 Driver', static function () use ($assertSame): void {
+    bootApplication(driverClass: FakeDriver::class);
+    app(Dispatcher::class)->addListener(DemoOccurred::class, FirstQueuedListener::class);
+
+    event(new DemoOccurred('manual-queued'));
+
+    /** @var FakeDriver $driver */
+    $driver = app(Driver::class);
+    $assertSame(1, count($driver->envelopes), '手动异步注册未发布唯一事件总消息');
+});
+
+$run('手动注册异步监听器缺少 Driver 时立即失败', static function () use ($assertThrows): void {
+    bootApplication();
+
+    $assertThrows(
+        EventConfigException::class,
+        static fn () => app(Dispatcher::class)->addListener(
+            DemoOccurred::class,
+            FirstQueuedListener::class,
+        ),
+        '手动异步注册绕过了 Driver 门禁',
+    );
+});
+
 $run('同步异常原样传播并停止后续监听器', static function () use ($assertSame, $assertThrows): void {
     [, $log] = bootApplication([
         DemoOccurred::class => [FirstListener::class, ThrowingListener::class, SecondListener::class],
@@ -212,6 +285,109 @@ $run('同步异常原样传播并停止后续监听器', static function () use 
         ['first:failed', 'throwing:failed'],
         $log->entries,
         '异常后仍执行了后续监听器',
+    );
+});
+
+$run('单个异步监听器只发布一个事件总消息', static function () use ($assertSame): void {
+    [, $log] = bootApplication(
+        [DemoOccurred::class => [FirstQueuedListener::class]],
+        driverClass: FakeDriver::class,
+    );
+    $event = new DemoOccurred('single-queued');
+
+    event($event);
+
+    /** @var FakeDriver $driver */
+    $driver = app(Driver::class);
+    $assertSame([], $log->entries, '异步监听器不应在 dispatch 进程内执行');
+    $assertSame(1, count($driver->envelopes), '单个异步监听器应只发布一次');
+    $assertSame($event, $driver->envelopes[0]->event, 'Envelope 未保留当前事件实例');
+    $assertSame(
+        [FirstQueuedListener::class],
+        $driver->envelopes[0]->listeners,
+        'Envelope 的异步监听器列表错误',
+    );
+});
+
+$run('多个异步监听器合并为一个有序事件总消息', static function () use ($assertSame): void {
+    [, $log] = bootApplication(
+        [DemoOccurred::class => [FirstQueuedListener::class, SecondQueuedListener::class]],
+        driverClass: FakeDriver::class,
+    );
+
+    event(new DemoOccurred('multi-queued'));
+
+    /** @var FakeDriver $driver */
+    $driver = app(Driver::class);
+    $assertSame([], $log->entries, '异步监听器不应被本地执行');
+    $assertSame(1, count($driver->envelopes), '多个异步监听器不应拆成多条消息');
+    $assertSame(
+        [FirstQueuedListener::class, SecondQueuedListener::class],
+        $driver->envelopes[0]->listeners,
+        '异步监听器声明顺序未被保留',
+    );
+});
+
+$run('同步监听器执行完成后再发布异步事件总消息', static function () use ($assertSame): void {
+    [, $log] = bootApplication(
+        [DemoOccurred::class => [FirstQueuedListener::class, FirstListener::class, SecondQueuedListener::class, SecondListener::class]],
+        driverClass: FakeDriver::class,
+    );
+
+    event(new DemoOccurred('mixed'));
+
+    /** @var FakeDriver $driver */
+    $driver = app(Driver::class);
+    $assertSame(['first:mixed', 'second:mixed'], $log->entries, '同步监听器执行结果错误');
+    $assertSame(1, count($driver->envelopes), '混合分发未生成唯一异步消息');
+    $assertSame(
+        [FirstQueuedListener::class, SecondQueuedListener::class],
+        $driver->envelopes[0]->listeners,
+        '混合分发未保持异步监听器声明顺序',
+    );
+});
+
+$run('同步监听器失败时不发布异步消息', static function () use ($assertSame, $assertThrows): void {
+    bootApplication(
+        [DemoOccurred::class => [FirstQueuedListener::class, ThrowingListener::class]],
+        driverClass: FakeDriver::class,
+    );
+
+    $assertThrows(
+        \RuntimeException::class,
+        static fn () => event(new DemoOccurred('sync-failed')),
+        '同步监听器异常未向上传播',
+    );
+
+    /** @var FakeDriver $driver */
+    $driver = app(Driver::class);
+    $assertSame([], $driver->envelopes, '同步失败后仍发布了异步消息');
+});
+
+$run('异步监听器缺少 Driver 配置时启动失败', static function () use ($assertThrows): void {
+    $assertThrows(
+        EventConfigException::class,
+        static fn () => bootApplication([DemoOccurred::class => [FirstQueuedListener::class]]),
+        '异步监听器缺少 Driver 时未在启动期失败',
+    );
+});
+
+$run('非法 Driver 配置时启动失败', static function () use ($assertThrows): void {
+    $assertThrows(
+        EventConfigException::class,
+        static fn () => bootApplication(
+            [DemoOccurred::class => [FirstQueuedListener::class]],
+            driverClass: InvalidDriver::class,
+        ),
+        '未实现 Driver 的类未在启动期失败',
+    );
+});
+
+$run('显式空 Driver 配置时启动失败', static function () use ($assertThrows): void {
+    $assertThrows(
+        EventConfigException::class,
+        static fn () => bootApplication(driverClass: ''),
+        '显式声明但未填写 Driver 类名时未在启动期失败',
     );
 });
 
