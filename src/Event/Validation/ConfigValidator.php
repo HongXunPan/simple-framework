@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace HongXunPan\Framework\Event\Validation;
 
+use HongXunPan\Framework\Event\Consumer\Consumer;
 use HongXunPan\Framework\Event\Driver\Driver;
 use HongXunPan\Framework\Event\Driver\RedisStreamDriver;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Listener\ShouldQueue;
+use Throwable;
 
 final class ConfigValidator
 {
@@ -47,6 +49,30 @@ final class ConfigValidator
         }
 
         return $driverClass;
+    }
+
+    /**
+     * @param class-string<Driver> $driverClass
+     * @return class-string<Consumer>
+     */
+    public function resolveConsumerClass(string $driverClass): string
+    {
+        try {
+            $consumerClass = $driverClass::consumer();
+        } catch (Throwable $throwable) {
+            throw new EventConfigException(
+                "Event Driver 无法声明 Consumer：{$driverClass}",
+                previous: $throwable,
+            );
+        }
+
+        if (!class_exists($consumerClass) || !is_a($consumerClass, Consumer::class, true)) {
+            throw new EventConfigException(
+                "Event Driver 的 consumer() 必须返回 Consumer 类：{$driverClass}",
+            );
+        }
+
+        return $consumerClass;
     }
 
     /** @param array<mixed> $listeners */

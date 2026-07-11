@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace HongXunPan\Framework\Event\Bootstrap;
 
 use HongXunPan\Framework\Event\Consumer\Consumer;
-use HongXunPan\Framework\Event\Consumer\RedisStreamConsumer;
 use HongXunPan\Framework\Event\Dispatch\Dispatcher;
 use HongXunPan\Framework\Event\Driver\Driver;
-use HongXunPan\Framework\Event\Driver\RedisStreamDriver;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Listener\ListenerRegistry;
 use HongXunPan\Framework\Event\Serialization\Serializer;
@@ -38,14 +36,14 @@ final class EventBootstrapper
             throw new EventConfigException('events.listeners 必须是数组');
         }
 
-        $driverClass = app(ConfigValidator::class)->resolveDriverClass($events, $listeners);
+        $config = app(ConfigValidator::class);
+        $driverClass = $config->resolveDriverClass($events, $listeners);
         if ($driverClass !== null) {
+            $consumerClass = $config->resolveConsumerClass($driverClass);
             app()->singleton(Driver::class, $driverClass);
-            if (is_a($driverClass, RedisStreamDriver::class, true)) {
-                app()->singleton(Consumer::class, RedisStreamConsumer::class);
-                app()->singleton(EnvelopeRunner::class);
-                app()->singleton(EventWorker::class);
-            }
+            app()->singleton(Consumer::class, $consumerClass);
+            app()->singleton(EnvelopeRunner::class);
+            app()->singleton(EventWorker::class);
         }
 
         $dispatcher = app(Dispatcher::class);

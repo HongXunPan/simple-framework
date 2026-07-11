@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HongXunPan\Framework\Event\Driver;
 
 use HongXunPan\DB\Redis\Redis as RedisManager;
+use HongXunPan\Framework\Event\Consumer\RedisStreamConsumer;
 use HongXunPan\Framework\Event\Dispatch\Envelope;
 use HongXunPan\Framework\Event\Exception\EventPublishException;
 use HongXunPan\Framework\Event\Serialization\Serializer;
@@ -16,6 +17,11 @@ final readonly class RedisStreamDriver implements Driver
 
     public function __construct(private Serializer $serializer)
     {
+    }
+
+    public static function consumer(): string
+    {
+        return RedisStreamConsumer::class;
     }
 
     public function publish(Envelope $envelope): void

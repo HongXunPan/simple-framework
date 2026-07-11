@@ -6,6 +6,8 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 use HongXunPan\Framework\Core\Application;
 use HongXunPan\Framework\Event\Bootstrap\EventBootstrapper;
+use HongXunPan\Framework\Event\Consumer\Consumer;
+use HongXunPan\Framework\Event\Consumer\Message;
 use HongXunPan\Framework\Event\Dispatch\Dispatcher;
 use HongXunPan\Framework\Event\Dispatch\Envelope;
 use HongXunPan\Framework\Event\Driver\Driver;
@@ -98,9 +100,42 @@ final class FakeDriver implements Driver
     /** @var list<Envelope> */
     public array $envelopes = [];
 
+    public static function consumer(): string
+    {
+        return SyncFakeConsumer::class;
+    }
+
     public function publish(Envelope $envelope): void
     {
         $this->envelopes[] = $envelope;
+    }
+}
+
+final class SyncFakeConsumer implements Consumer
+{
+    public function receive(): iterable
+    {
+        return [];
+    }
+
+    public function acknowledge(Message $message): void
+    {
+    }
+
+    public function fail(Message $message, string $failure): void
+    {
+    }
+}
+
+final class InvalidConsumerDriver implements Driver
+{
+    public static function consumer(): string
+    {
+        return InvalidDriver::class;
+    }
+
+    public function publish(Envelope $envelope): void
+    {
     }
 }
 
@@ -256,6 +291,13 @@ $run('手动注册异步监听器时复用已配置 Driver', static function () 
     $assertSame(1, count($driver->envelopes), '手动异步注册未发布唯一事件总消息');
 });
 
+$run('Driver 声明的 Consumer 由启动器自动绑定', static function () use ($assertSame): void {
+    bootApplication(driverClass: FakeDriver::class);
+
+    $assertSame(SyncFakeConsumer::class, app(Consumer::class)::class, 'Driver Consumer 未自动绑定');
+    $assertSame(app(Consumer::class), app(Consumer::class), 'Consumer 未保持进程级单例');
+});
+
 $run('手动注册异步监听器缺少 Driver 时立即失败', static function () use ($assertThrows): void {
     bootApplication();
 
@@ -380,6 +422,14 @@ $run('非法 Driver 配置时启动失败', static function () use ($assertThrow
             driverClass: InvalidDriver::class,
         ),
         '未实现 Driver 的类未在启动期失败',
+    );
+});
+
+$run('Driver 声明非法 Consumer 时启动失败', static function () use ($assertThrows): void {
+    $assertThrows(
+        EventConfigException::class,
+        static fn () => bootApplication(driverClass: InvalidConsumerDriver::class),
+        'Driver 返回非 Consumer 类时未在启动期失败',
     );
 });
 
