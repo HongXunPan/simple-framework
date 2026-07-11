@@ -65,6 +65,7 @@ final readonly class WorkerFailingListener implements WorkerShouldQueue
 /**
  * @param list<class-string<WorkerShouldQueue>> $listeners
  * @param array<string, mixed> $driverOverrides
+ * @param array<int, mixed> $redisOptions
  * @return array{
  *     redis: Redis,
  *     worker: EventWorker,
@@ -74,7 +75,11 @@ final readonly class WorkerFailingListener implements WorkerShouldQueue
  *     failed_stream: string
  * }
  */
-function bootRedisStreamConsumer(array $listeners, array $driverOverrides = []): array
+function bootRedisStreamConsumer(
+    array $listeners,
+    array $driverOverrides = [],
+    array $redisOptions = [],
+): array
 {
     putenv('DEBUG=false');
     $loaded = (new ReflectionClass(WorkerEnv::class))->getProperty('loaded');
@@ -113,7 +118,7 @@ function bootRedisStreamConsumer(array $listeners, array $driverOverrides = []):
             'listeners' => [WorkerOccurred::class => $listeners],
         ],
     ];
-    WorkerRedisManager::setConfig($redisConfig, $connection);
+    WorkerRedisManager::setConfig($redisConfig, $connection, $redisOptions);
 
     $application = new WorkerApplication();
     WorkerApplication::setInstance($application);
@@ -196,6 +201,23 @@ $runWorker('Worker 按顺序执行并完成 ACK 与删除', static function () u
         $pending = $context['redis']->xPending($context['stream'], $context['group']);
         $workerAssertSame(0, $pending[0] ?? null, '成功消息仍残留在 pending');
         $workerAssertSame(0, $context['worker']->runOnce(), '空队列重复消费了消息');
+    } finally {
+        cleanupRedisStreamConsumer($context);
+    }
+});
+
+$runWorker('Redis key 前缀不影响新消息消费', static function () use ($workerAssertSame): void {
+    $context = bootRedisStreamConsumer(
+        [WorkerFirstListener::class],
+        redisOptions: [Redis::OPT_PREFIX => 'simple-framework-test:'],
+    );
+
+    try {
+        event(new WorkerOccurred('prefixed'));
+
+        $workerAssertSame(1, $context['worker']->runOnce(), '带前缀的 Stream 消息未被消费');
+        $workerAssertSame(['first:prefixed'], $context['log']->entries, '带前缀消息未执行 listener');
+        $workerAssertSame(0, $context['redis']->xLen($context['stream']), '带前缀消息未从主 Stream 删除');
     } finally {
         cleanupRedisStreamConsumer($context);
     }

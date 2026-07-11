@@ -175,7 +175,15 @@ final class RedisStreamConsumer implements Consumer
             return [];
         }
 
-        $entries = $streams[$this->stream] ?? [];
+        if ($streams === []) {
+            return [];
+        }
+
+        if (count($streams) !== 1) {
+            throw new EventConsumeException('Redis 新消息返回的 Stream 数量异常');
+        }
+
+        $entries = array_values($streams)[0];
 
         return is_array($entries) ? $entries : [];
     }
