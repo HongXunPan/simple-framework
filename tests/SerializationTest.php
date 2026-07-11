@@ -192,7 +192,7 @@ $runSerialization('Symfony JSON 完整往返标量枚举与时间', static funct
     $message = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
     $restored = $serializer->deserialize($json);
 
-    $serializationAssertSame(1, $message['message_version'], '消息版本未写入 JSON');
+    $serializationAssertSame(1, $message['envelope_version'], 'Envelope 版本未写入 JSON');
     $serializationAssertSame(SerializableOccurred::class, $message['event_class'], 'Event class 未写入 JSON');
     $serializationAssertSame(2, $message['event_version'], 'Event version 未写入 JSON');
     $serializationAssertSame('approved', $message['payload']['status'], '枚举未规范化为 backing value');
@@ -266,7 +266,7 @@ $runSerialization('Event Validator 拒绝非白名单结构', static function ()
     }
 });
 
-$runSerialization('反序列化拒绝未知消息版本与 Event 版本', static function () use ($serializationAssertThrows): void {
+$runSerialization('反序列化拒绝未知 Envelope 版本与 Event 版本', static function () use ($serializationAssertThrows): void {
     $serializer = new SymfonySerializer(new EventValidator());
     $json = $serializer->serialize(new Envelope(
         eventId: 'event-version-test',
@@ -284,14 +284,14 @@ $runSerialization('反序列化拒绝未知消息版本与 Event 版本', static
     ));
     $message = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
 
-    $message['message_version'] = 2;
+    $message['envelope_version'] = 2;
     $serializationAssertThrows(
         UnexpectedValueException::class,
         static fn () => $serializer->deserialize(json_encode($message, JSON_THROW_ON_ERROR)),
-        '未知消息版本未被拒绝',
+        '未知 Envelope 版本未被拒绝',
     );
 
-    $message['message_version'] = 1;
+    $message['envelope_version'] = 1;
     $message['event_version'] = 3;
     $serializationAssertThrows(
         UnexpectedValueException::class,

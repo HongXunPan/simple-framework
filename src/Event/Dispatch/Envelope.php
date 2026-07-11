@@ -10,7 +10,7 @@ use HongXunPan\Framework\Event\Listener\ShouldQueue;
 
 final readonly class Envelope
 {
-    public const int CURRENT_MESSAGE_VERSION = 1;
+    public const int CURRENT_ENVELOPE_VERSION = 1;
 
     /**
      * @param list<class-string<ShouldQueue>> $listeners
@@ -21,7 +21,7 @@ final readonly class Envelope
         public Event $event,
         public array $listeners,
         public ?string $traceId = null,
-        public int $messageVersion = self::CURRENT_MESSAGE_VERSION,
+        public int $envelopeVersion = self::CURRENT_ENVELOPE_VERSION,
     ) {
     }
 }

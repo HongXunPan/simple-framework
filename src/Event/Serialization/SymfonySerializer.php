@@ -38,8 +38,8 @@ final readonly class SymfonySerializer implements Serializer
 
     public function serialize(Envelope $envelope): string
     {
-        if ($envelope->messageVersion !== Envelope::CURRENT_MESSAGE_VERSION) {
-            throw new UnexpectedValueException("不支持的 Event 消息版本：{$envelope->messageVersion}");
+        if ($envelope->envelopeVersion !== Envelope::CURRENT_ENVELOPE_VERSION) {
+            throw new UnexpectedValueException("不支持的 Envelope 版本：{$envelope->envelopeVersion}");
         }
         if ($envelope->eventId === '') {
             throw new UnexpectedValueException('Event event_id 必须是非空字符串');
@@ -58,7 +58,7 @@ final readonly class SymfonySerializer implements Serializer
         }
 
         return $this->serializer->encode([
-            'message_version' => $envelope->messageVersion,
+            'envelope_version' => $envelope->envelopeVersion,
             'event_id' => $envelope->eventId,
             'occurred_at' => $envelope->occurredAt->format(self::DATE_FORMAT),
             'trace_id' => $envelope->traceId,
@@ -78,9 +78,9 @@ final readonly class SymfonySerializer implements Serializer
             throw new UnexpectedValueException('Event JSON 顶层必须是对象');
         }
 
-        $messageVersion = $this->positiveInt($message, 'message_version');
-        if ($messageVersion !== Envelope::CURRENT_MESSAGE_VERSION) {
-            throw new UnexpectedValueException("不支持的 Event 消息版本：{$messageVersion}");
+        $envelopeVersion = $this->positiveInt($message, 'envelope_version');
+        if ($envelopeVersion !== Envelope::CURRENT_ENVELOPE_VERSION) {
+            throw new UnexpectedValueException("不支持的 Envelope 版本：{$envelopeVersion}");
         }
 
         $eventClass = $this->nonEmptyString($message, 'event_class');
@@ -117,7 +117,7 @@ final readonly class SymfonySerializer implements Serializer
             event: $event,
             listeners: $listeners,
             traceId: $traceId,
-            messageVersion: $messageVersion,
+            envelopeVersion: $envelopeVersion,
         );
     }
 
