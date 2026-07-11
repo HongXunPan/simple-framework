@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace HongXunPan\Framework\Event\Bootstrap;
 
+use HongXunPan\Framework\Event\Consumer\Consumer;
+use HongXunPan\Framework\Event\Consumer\RedisStreamConsumer;
 use HongXunPan\Framework\Event\Dispatch\Dispatcher;
 use HongXunPan\Framework\Event\Driver\Driver;
+use HongXunPan\Framework\Event\Driver\RedisStreamDriver;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Listener\ListenerRegistry;
 use HongXunPan\Framework\Event\Serialization\Serializer;
 use HongXunPan\Framework\Event\Serialization\SymfonySerializer;
 use HongXunPan\Framework\Event\Validation\ConfigValidator;
 use HongXunPan\Framework\Event\Validation\EventValidator;
+use HongXunPan\Framework\Event\Worker\EnvelopeRunner;
+use HongXunPan\Framework\Event\Worker\EventWorker;
 
 final class EventBootstrapper
 {
@@ -36,6 +41,11 @@ final class EventBootstrapper
         $driverClass = app(ConfigValidator::class)->resolveDriverClass($events, $listeners);
         if ($driverClass !== null) {
             app()->singleton(Driver::class, $driverClass);
+            if (is_a($driverClass, RedisStreamDriver::class, true)) {
+                app()->singleton(Consumer::class, RedisStreamConsumer::class);
+                app()->singleton(EnvelopeRunner::class);
+                app()->singleton(EventWorker::class);
+            }
         }
 
         $dispatcher = app(Dispatcher::class);
