@@ -9,11 +9,16 @@ use HongXunPan\Framework\Event\Driver\Driver;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Listener\ListenerRegistry;
 use HongXunPan\Framework\Event\Listener\ShouldQueue;
+use HongXunPan\Framework\Event\Serialization\Serializer;
+use HongXunPan\Framework\Event\Serialization\SymfonySerializer;
+use HongXunPan\Framework\Event\Validation\EventValidator;
 
 final class EventBootstrapper
 {
     public static function boot(): void
     {
+        app()->singleton(EventValidator::class);
+        app()->singleton(Serializer::class, SymfonySerializer::class);
         app()->singleton(ListenerRegistry::class);
         app()->singleton(Dispatcher::class);
 

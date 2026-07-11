@@ -19,8 +19,11 @@
         "php": "^8.5",
         "illuminate/container": "^12.0",
         "opis/closure": "^4.0",
-        "symfony/var-dumper": "^7.0",
-        "hongxunpan/php-tools": "^2.9"
+        "hongxunpan/php-tools": "^2.9",
+        "symfony/property-access": "^7.0",
+        "symfony/property-info": "^7.0",
+        "symfony/serializer": "^7.0",
+        "symfony/var-dumper": "^7.0"
     },
     "scripts": {
         "test": "@php tests/TestRunner.php"

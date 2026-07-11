@@ -6,8 +6,8 @@ namespace HongXunPan\Framework\Event\Listener;
 
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
+use HongXunPan\Framework\Event\Validation\EventValidator;
 use HongXunPan\Framework\Event\Validation\ListenerValidator;
-use ReflectionClass;
 
 final class ListenerRegistry
 {
@@ -16,8 +16,10 @@ final class ListenerRegistry
      */
     private array $listeners = [];
 
-    public function __construct(private readonly ListenerValidator $validator)
-    {
+    public function __construct(
+        private readonly EventValidator $events,
+        private readonly ListenerValidator $listenersValidator,
+    ) {
     }
 
     /**
@@ -26,8 +28,8 @@ final class ListenerRegistry
      */
     public function addListener(string $eventClass, string $listenerClass): void
     {
-        $this->validateEventClass($eventClass);
-        $this->validator->validate($listenerClass, $eventClass);
+        $this->events->validate($eventClass);
+        $this->listenersValidator->validate($listenerClass, $eventClass);
 
         $listeners = $this->listeners[$eventClass] ?? [];
         if (in_array($listenerClass, $listeners, true)) {
@@ -45,20 +47,5 @@ final class ListenerRegistry
     public function listenersFor(Event $event): array
     {
         return $this->listeners[$event::class] ?? [];
-    }
-
-    /**
-     * @param class-string $eventClass
-     */
-    private function validateEventClass(string $eventClass): void
-    {
-        if (!class_exists($eventClass)) {
-            throw new EventConfigException("事件类不存在：{$eventClass}");
-        }
-
-        $event = new ReflectionClass($eventClass);
-        if (!$event->isInstantiable() || !$event->implementsInterface(Event::class)) {
-            throw new EventConfigException("事件类必须是可实例化的 Event：{$eventClass}");
-        }
     }
 }
