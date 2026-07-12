@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use HongXunPan\Framework\Event\Dispatch\Envelope;
+use HongXunPan\Framework\Event\Dispatch\EventMessage;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Listener\ShouldQueue;
@@ -181,7 +181,7 @@ $runSerialization('Symfony JSON 完整往返标量枚举与时间', static funct
         status: SerializationStatus::Approved,
         approvedAt: new DateTimeImmutable('2026-07-11T12:34:56.123456+08:00'),
     );
-    $envelope = new Envelope(
+    $eventMessage = new EventMessage(
         eventId: 'event-20260711-0001',
         occurredAt: new DateTimeImmutable('2026-07-11T12:35:00.654321+08:00'),
         event: $event,
@@ -189,11 +189,11 @@ $runSerialization('Symfony JSON 完整往返标量枚举与时间', static funct
         traceId: 'trace-0759',
     );
 
-    $json = $serializer->serialize($envelope);
+    $json = $serializer->serialize($eventMessage);
     $message = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
     $restored = $serializer->deserialize($json);
 
-    $serializationAssertSame(1, $message['envelope_version'], 'Envelope 版本未写入 JSON');
+    $serializationAssertSame(1, $message['message_version'], 'EventMessage 版本未写入 JSON');
     $serializationAssertSame(SerializableOccurred::class, $message['event_class'], 'Event class 未写入 JSON');
     $serializationAssertSame(2, $message['event_version'], 'Event version 未写入 JSON');
     $serializationAssertSame('approved', $message['payload']['status'], '枚举未规范化为 backing value');
@@ -224,7 +224,7 @@ $runSerialization('未声明 VERSION 的 Event 默认使用版本 1', static fun
 
 $runSerialization('无属性 Event 使用空 JSON 对象并可往返', static function () use ($serializationAssertSame): void {
     $serializer = new SymfonySerializer(new EventValidator(), new ListenerValidator());
-    $json = $serializer->serialize(new Envelope(
+    $json = $serializer->serialize(new EventMessage(
         eventId: 'event-empty-payload',
         occurredAt: new DateTimeImmutable('2026-07-11T12:35:00+08:00'),
         event: new OtherOccurred(),
@@ -267,9 +267,9 @@ $runSerialization('Event Validator 拒绝非白名单结构', static function ()
     }
 });
 
-$runSerialization('反序列化拒绝未知 Envelope 版本与 Event 版本', static function () use ($serializationAssertThrows): void {
+$runSerialization('反序列化拒绝未知 EventMessage 版本与 Event 版本', static function () use ($serializationAssertThrows): void {
     $serializer = new SymfonySerializer(new EventValidator(), new ListenerValidator());
-    $json = $serializer->serialize(new Envelope(
+    $json = $serializer->serialize(new EventMessage(
         eventId: 'event-version-test',
         occurredAt: new DateTimeImmutable('2026-07-11T12:35:00+08:00'),
         event: new SerializableOccurred(
@@ -285,14 +285,14 @@ $runSerialization('反序列化拒绝未知 Envelope 版本与 Event 版本', st
     ));
     $message = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
 
-    $message['envelope_version'] = 2;
+    $message['message_version'] = 2;
     $serializationAssertThrows(
         UnexpectedValueException::class,
         static fn () => $serializer->deserialize(json_encode($message, JSON_THROW_ON_ERROR)),
-        '未知 Envelope 版本未被拒绝',
+        '未知 EventMessage 版本未被拒绝',
     );
 
-    $message['envelope_version'] = 1;
+    $message['message_version'] = 1;
     $message['event_version'] = 3;
     $serializationAssertThrows(
         UnexpectedValueException::class,
@@ -311,7 +311,7 @@ $runSerialization('反序列化拒绝非法 JSON', static function () use ($seri
     );
 });
 
-$runSerialization('序列化拒绝非法 Envelope 元数据', static function () use ($serializationAssertThrows): void {
+$runSerialization('序列化拒绝非法 EventMessage 元数据', static function () use ($serializationAssertThrows): void {
     $serializer = new SymfonySerializer(new EventValidator(), new ListenerValidator());
     $event = new SerializableOccurred(
         7,
@@ -324,21 +324,21 @@ $runSerialization('序列化拒绝非法 Envelope 元数据', static function ()
     );
 
     foreach ([
-        new Envelope('', new DateTimeImmutable(), $event, [SerializationQueuedListener::class]),
-        new Envelope('event-empty-trace', new DateTimeImmutable(), $event, [SerializationQueuedListener::class], ''),
-        new Envelope('event-version', new DateTimeImmutable(), $event, [SerializationQueuedListener::class], null, 2),
-    ] as $envelope) {
+        new EventMessage('', new DateTimeImmutable(), $event, [SerializationQueuedListener::class]),
+        new EventMessage('event-empty-trace', new DateTimeImmutable(), $event, [SerializationQueuedListener::class], ''),
+        new EventMessage('event-version', new DateTimeImmutable(), $event, [SerializationQueuedListener::class], null, 2),
+    ] as $eventMessage) {
         $serializationAssertThrows(
             UnexpectedValueException::class,
-            static fn () => $serializer->serialize($envelope),
-            '非法 Envelope 元数据未被拒绝',
+            static fn () => $serializer->serialize($eventMessage),
+            '非法 EventMessage 元数据未被拒绝',
         );
     }
 });
 
 $runSerialization('反序列化拒绝宽松时间格式', static function () use ($serializationAssertThrows): void {
     $serializer = new SymfonySerializer(new EventValidator(), new ListenerValidator());
-    $json = $serializer->serialize(new Envelope(
+    $json = $serializer->serialize(new EventMessage(
         eventId: 'event-time-format',
         occurredAt: new DateTimeImmutable('2026-07-11T12:35:00+08:00'),
         event: new SerializableOccurred(

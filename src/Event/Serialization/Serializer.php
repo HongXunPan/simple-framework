@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace HongXunPan\Framework\Event\Serialization;
 
-use HongXunPan\Framework\Event\Dispatch\Envelope;
+use HongXunPan\Framework\Event\Dispatch\EventMessage;
 
 interface Serializer
 {
-    public function serialize(Envelope $envelope): string;
+    public function serialize(EventMessage $message): string;
 
-    public function deserialize(string $payload): Envelope;
+    public function deserialize(string $payload): EventMessage;
 }

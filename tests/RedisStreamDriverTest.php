@@ -5,7 +5,7 @@ declare(strict_types=1);
 use HongXunPan\DB\Redis\Redis as RedisManager;
 use HongXunPan\Framework\Core\Application;
 use HongXunPan\Framework\Event\Bootstrap\EventBootstrapper;
-use HongXunPan\Framework\Event\Dispatch\Envelope;
+use HongXunPan\Framework\Event\Dispatch\EventMessage;
 use HongXunPan\Framework\Event\Driver\RedisStreamDriver;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
@@ -32,12 +32,12 @@ final readonly class RedisPublishedListener implements ShouldQueue
 
 final class ThrowingEventSerializer implements Serializer
 {
-    public function serialize(Envelope $envelope): string
+    public function serialize(EventMessage $message): string
     {
         throw new RuntimeException('测试序列化失败');
     }
 
-    public function deserialize(string $payload): Envelope
+    public function deserialize(string $payload): EventMessage
     {
         throw new LogicException('测试不调用反序列化');
     }
@@ -45,12 +45,12 @@ final class ThrowingEventSerializer implements Serializer
 
 final class FixedEventSerializer implements Serializer
 {
-    public function serialize(Envelope $envelope): string
+    public function serialize(EventMessage $message): string
     {
-        return '{"envelope_version":1}';
+        return '{"message_version":1}';
     }
 
-    public function deserialize(string $payload): Envelope
+    public function deserialize(string $payload): EventMessage
     {
         throw new LogicException('测试不调用反序列化');
     }
@@ -209,7 +209,7 @@ $runRedis('Redis Driver 包装序列化异常', static function () use ($redisAs
 
     $throwable = $redisAssertThrows(
         EventPublishException::class,
-        static fn () => $driver->publish(new Envelope(
+        static fn () => $driver->publish(new EventMessage(
             eventId: 'event-serialize-failed',
             occurredAt: new DateTimeImmutable(),
             event: new RedisPublishedOccurred('序列化失败'),
@@ -235,7 +235,7 @@ $runRedis('Redis Driver 包装连接异常', static function () use ($redisAsser
 
     $throwable = $redisAssertThrows(
         EventPublishException::class,
-        static fn () => $driver->publish(new Envelope(
+        static fn () => $driver->publish(new EventMessage(
             eventId: 'event-redis-failed',
             occurredAt: new DateTimeImmutable(),
             event: new RedisPublishedOccurred('Redis 失败'),
@@ -267,7 +267,7 @@ $runRedis('一次 dispatch 只写入一条 Redis Stream 消息', static function
         $redisAssertSame(['message'], array_keys($entry), 'stream entry 未保持单 message 字段');
 
         $message = json_decode($entry['message'], true, flags: JSON_THROW_ON_ERROR);
-        $redisAssertSame(1, $message['envelope_version'], 'Redis 消息 Envelope 版本错误');
+        $redisAssertSame(1, $message['message_version'], 'Redis 消息 EventMessage 版本错误');
         $redisAssertSame(RedisPublishedOccurred::class, $message['event_class'], 'Redis 消息 Event class 错误');
         $redisAssertSame(
             [RedisPublishedListener::class],

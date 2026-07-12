@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace HongXunPan\Framework\Event\Driver;
 
 use HongXunPan\Framework\Event\Consumer\Consumer;
-use HongXunPan\Framework\Event\Dispatch\Envelope;
+use HongXunPan\Framework\Event\Dispatch\EventMessage;
 
 interface Driver
 {
@@ -15,5 +15,5 @@ interface Driver
     /** @return class-string<Consumer> */
     public static function consumer(): string;
 
-    public function publish(Envelope $envelope): void;
+    public function publish(EventMessage $message): void;
 }

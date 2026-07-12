@@ -56,7 +56,7 @@ final class RedisStreamConsumer implements Consumer
         return $messages;
     }
 
-    public function acknowledge(Message $message): void
+    public function acknowledge(ReceivedMessage $message): void
     {
         try {
             $acknowledged = $this->redis()->xAck($this->stream, $this->group, [$message->id]);
@@ -74,7 +74,7 @@ final class RedisStreamConsumer implements Consumer
         }
     }
 
-    public function fail(Message $message, Failure $failure): void
+    public function fail(ReceivedMessage $message, Failure $failure): void
     {
         $failurePayload = $this->serializeFailure($failure);
 
@@ -194,14 +194,14 @@ final class RedisStreamConsumer implements Consumer
 
     /**
      * @param array<string, array<string, string>> $entries
-     * @return list<Message>
+     * @return list<ReceivedMessage>
      */
     private function messages(array $entries): array
     {
         $messages = [];
         foreach ($entries as $streamId => $fields) {
             $body = $fields[self::MESSAGE_FIELD] ?? '';
-            $messages[] = new Message($streamId, is_string($body) ? $body : '');
+            $messages[] = new ReceivedMessage($streamId, is_string($body) ? $body : '');
         }
 
         return $messages;

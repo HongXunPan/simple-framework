@@ -6,7 +6,7 @@ namespace HongXunPan\Framework\Event\Driver;
 
 use HongXunPan\DB\Redis\Redis as RedisManager;
 use HongXunPan\Framework\Event\Consumer\RedisStreamConsumer;
-use HongXunPan\Framework\Event\Dispatch\Envelope;
+use HongXunPan\Framework\Event\Dispatch\EventMessage;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Exception\EventPublishException;
 use HongXunPan\Framework\Event\Serialization\Serializer;
@@ -59,7 +59,7 @@ final readonly class RedisStreamDriver implements Driver
         return RedisStreamConsumer::class;
     }
 
-    public function publish(Envelope $envelope): void
+    public function publish(EventMessage $message): void
     {
         $connection = config('events.driver.connection');
         $stream = config('events.driver.stream');
@@ -68,10 +68,10 @@ final readonly class RedisStreamDriver implements Driver
         }
 
         try {
-            $payload = $this->serializer->serialize($envelope);
+            $payload = $this->serializer->serialize($message);
         } catch (Throwable $throwable) {
             throw new EventPublishException(
-                "Event 序列化失败：{$envelope->eventId}",
+                "Event 序列化失败：{$message->eventId}",
                 previous: $throwable,
             );
         }
@@ -81,14 +81,14 @@ final readonly class RedisStreamDriver implements Driver
             $streamId = $redis->xAdd($stream, '*', [self::MESSAGE_FIELD => $payload]);
         } catch (Throwable $throwable) {
             throw new EventPublishException(
-                "Event 发布到 Redis Stream 失败：{$envelope->eventId}",
+                "Event 发布到 Redis Stream 失败：{$message->eventId}",
                 previous: $throwable,
             );
         }
 
         if (!is_string($streamId) || preg_match('/^\d+-\d+$/D', $streamId) !== 1) {
             throw new EventPublishException(
-                "Redis Stream 未返回有效消息 ID：{$envelope->eventId}",
+                "Redis Stream 未返回有效消息 ID：{$message->eventId}",
             );
         }
     }

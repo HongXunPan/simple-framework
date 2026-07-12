@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 use HongXunPan\Framework\Core\Application as ContractWorkerApplication;
 use HongXunPan\Framework\Event\Consumer\Consumer as ContractConsumer;
-use HongXunPan\Framework\Event\Consumer\Message as ContractMessage;
-use HongXunPan\Framework\Event\Dispatch\Envelope as ContractEnvelope;
+use HongXunPan\Framework\Event\Consumer\ReceivedMessage as ContractReceivedMessage;
+use HongXunPan\Framework\Event\Dispatch\EventMessage as ContractEventMessage;
 use HongXunPan\Framework\Event\Event as ContractWorkerEvent;
 use HongXunPan\Framework\Event\Execution\ErrorMessageSanitizer as ContractErrorMessageSanitizer;
 use HongXunPan\Framework\Event\Execution\Failure as ContractFailure;
 use HongXunPan\Framework\Event\Listener\ListenerCaller as ContractListenerCaller;
 use HongXunPan\Framework\Event\Serialization\Serializer as ContractWorkerSerializer;
 use HongXunPan\Framework\Event\Validation\EventValidator as ContractEventValidator;
-use HongXunPan\Framework\Event\Worker\EnvelopeRunner as ContractEnvelopeRunner;
+use HongXunPan\Framework\Event\Worker\EventMessageExecutor as ContractEventMessageExecutor;
 use HongXunPan\Framework\Event\Worker\EventWorker;
 
 final readonly class ContractWorkerOccurred implements ContractWorkerEvent
@@ -50,20 +50,20 @@ final readonly class ContractFailingWorkerListener
 
 final class FakeEventConsumer implements ContractConsumer
 {
-    /** @var list<ContractMessage> */
+    /** @var list<ContractReceivedMessage> */
     public array $messages;
 
-    /** @var list<ContractMessage> */
+    /** @var list<ContractReceivedMessage> */
     public array $acknowledged = [];
 
-    /** @var list<array{message: ContractMessage, failure: ContractFailure}> */
+    /** @var list<array{message: ContractReceivedMessage, failure: ContractFailure}> */
     public array $failed = [];
 
     public int $receiveCalls = 0;
 
     public ?Throwable $receiveFailure = null;
 
-    /** @param list<ContractMessage> $messages */
+    /** @param list<ContractReceivedMessage> $messages */
     public function __construct(array $messages)
     {
         $this->messages = $messages;
@@ -82,42 +82,42 @@ final class FakeEventConsumer implements ContractConsumer
         return $messages;
     }
 
-    public function acknowledge(ContractMessage $message): void
+    public function acknowledge(ContractReceivedMessage $message): void
     {
         $this->acknowledged[] = $message;
     }
 
-    public function fail(ContractMessage $message, ContractFailure $failure): void
+    public function fail(ContractReceivedMessage $message, ContractFailure $failure): void
     {
         $this->failed[] = compact('message', 'failure');
     }
 }
 
-final readonly class FixedEnvelopeSerializer implements ContractWorkerSerializer
+final readonly class FixedEventMessageSerializer implements ContractWorkerSerializer
 {
     public function __construct(
-        private ?ContractEnvelope $envelope = null,
+        private ?ContractEventMessage $eventMessage = null,
         private ?Throwable $failure = null,
     ) {
     }
 
-    public function serialize(ContractEnvelope $envelope): string
+    public function serialize(ContractEventMessage $message): string
     {
         return 'test-payload';
     }
 
-    public function deserialize(string $payload): ContractEnvelope
+    public function deserialize(string $payload): ContractEventMessage
     {
         if ($this->failure !== null) {
             throw $this->failure;
         }
 
-        return $this->envelope ?? throw new LogicException('测试 Envelope 未配置');
+        return $this->eventMessage ?? throw new LogicException('测试 EventMessage 未配置');
     }
 }
 
 /**
- * @param list<ContractMessage>|null $messages
+ * @param list<ContractReceivedMessage>|null $messages
  * @return array{worker: EventWorker, consumer: FakeEventConsumer, log: ContractWorkerLog}
  */
 function createContractEventWorker(
@@ -130,13 +130,13 @@ function createContractEventWorker(
     $application->instance(ContractWorkerLog::class, $log);
 
     $consumer = new FakeEventConsumer(
-        $messages ?? [new ContractMessage('message-1', 'test-payload')],
+        $messages ?? [new ContractReceivedMessage('message-1', 'test-payload')],
     );
     $errors = new ContractErrorMessageSanitizer();
     $worker = new EventWorker(
         $consumer,
         $serializer,
-        new ContractEnvelopeRunner(new ContractListenerCaller(), $errors),
+        new ContractEventMessageExecutor(new ContractListenerCaller(), $errors),
         new ContractEventValidator(),
         $errors,
     );
@@ -144,9 +144,9 @@ function createContractEventWorker(
     return compact('worker', 'consumer', 'log');
 }
 
-function contractEnvelope(array $listeners): ContractEnvelope
+function contractEventMessage(array $listeners): ContractEventMessage
 {
-    return new ContractEnvelope(
+    return new ContractEventMessage(
         eventId: 'event-contract-1',
         occurredAt: new DateTimeImmutable(),
         event: new ContractWorkerOccurred('contract'),
@@ -178,11 +178,11 @@ $runContractWorker = static function (string $name, callable $test) use (&$contr
 $runContractWorker('EventWorker 只依赖 Consumer 契约完成消息确认', static function () use (
     $contractWorkerAssertSame,
 ): void {
-    $envelope = contractEnvelope([ContractWorkerListener::class]);
-    $context = createContractEventWorker(new FixedEnvelopeSerializer($envelope));
+    $eventMessage = contractEventMessage([ContractWorkerListener::class]);
+    $context = createContractEventWorker(new FixedEventMessageSerializer($eventMessage));
 
     $contractWorkerAssertSame(1, $context['worker']->runOnce(), 'EventWorker 消费数量错误');
-    $contractWorkerAssertSame(['contract'], $context['log']->entries, 'EventWorker 未执行 Envelope listener');
+    $contractWorkerAssertSame(['contract'], $context['log']->entries, 'EventWorker 未执行 EventMessage listener');
     $contractWorkerAssertSame(['message-1'], array_column($context['consumer']->acknowledged, 'id'), '成功消息未确认');
     $contractWorkerAssertSame([], $context['consumer']->failed, '成功消息错误进入失败流程');
     $contractWorkerAssertSame(0, $context['worker']->runOnce(), 'Consumer 已清空后仍重复消费消息');
@@ -191,8 +191,8 @@ $runContractWorker('EventWorker 只依赖 Consumer 契约完成消息确认', st
 $runContractWorker('EventWorker 启动前收到停止条件时不领取消息', static function () use (
     $contractWorkerAssertSame,
 ): void {
-    $envelope = contractEnvelope([ContractWorkerListener::class]);
-    $context = createContractEventWorker(new FixedEnvelopeSerializer($envelope));
+    $eventMessage = contractEventMessage([ContractWorkerListener::class]);
+    $context = createContractEventWorker(new FixedEventMessageSerializer($eventMessage));
 
     $context['worker']->run(static fn (): bool => true);
 
@@ -203,12 +203,12 @@ $runContractWorker('EventWorker 启动前收到停止条件时不领取消息', 
 $runContractWorker('EventWorker 只在完整批次之间停止', static function () use (
     $contractWorkerAssertSame,
 ): void {
-    $envelope = contractEnvelope([ContractWorkerListener::class]);
+    $eventMessage = contractEventMessage([ContractWorkerListener::class]);
     $context = createContractEventWorker(
-        new FixedEnvelopeSerializer($envelope),
+        new FixedEventMessageSerializer($eventMessage),
         [
-            new ContractMessage('message-1', 'test-payload'),
-            new ContractMessage('message-2', 'test-payload'),
+            new ContractReceivedMessage('message-1', 'test-payload'),
+            new ContractReceivedMessage('message-2', 'test-payload'),
         ],
     );
     $checks = 0;
@@ -229,8 +229,8 @@ $runContractWorker('EventWorker 只在完整批次之间停止', static function
 $runContractWorker('EventWorker 不吞没 Consumer 运行异常', static function () use (
     $contractWorkerAssertSame,
 ): void {
-    $envelope = contractEnvelope([ContractWorkerListener::class]);
-    $context = createContractEventWorker(new FixedEnvelopeSerializer($envelope));
+    $eventMessage = contractEventMessage([ContractWorkerListener::class]);
+    $context = createContractEventWorker(new FixedEventMessageSerializer($eventMessage));
     $context['consumer']->receiveFailure = new RuntimeException('Consumer 读取失败');
 
     try {
@@ -246,8 +246,8 @@ $runContractWorker('EventWorker 不吞没 Consumer 运行异常', static functio
 $runContractWorker('EventWorker 将 listener 失败交给 Consumer', static function () use (
     $contractWorkerAssertSame,
 ): void {
-    $envelope = contractEnvelope([ContractFailingWorkerListener::class]);
-    $context = createContractEventWorker(new FixedEnvelopeSerializer($envelope));
+    $eventMessage = contractEventMessage([ContractFailingWorkerListener::class]);
+    $context = createContractEventWorker(new FixedEventMessageSerializer($eventMessage));
 
     $contractWorkerAssertSame(1, $context['worker']->runOnce(), '失败消息未计入消费数量');
     $contractWorkerAssertSame([], $context['consumer']->acknowledged, '失败消息被直接确认');
@@ -276,7 +276,7 @@ $runContractWorker('EventWorker 将反序列化失败交给 Consumer', static fu
     $contractWorkerAssertSame,
 ): void {
     $context = createContractEventWorker(
-        new FixedEnvelopeSerializer(failure: new RuntimeException('token=secret mobile=13800138000')),
+        new FixedEventMessageSerializer(failure: new RuntimeException('token=secret mobile=13800138000')),
     );
 
     $contractWorkerAssertSame(1, $context['worker']->runOnce(), '反序列化失败消息未计数');

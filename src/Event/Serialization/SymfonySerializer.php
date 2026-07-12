@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace HongXunPan\Framework\Event\Serialization;
 
 use DateTimeImmutable;
-use HongXunPan\Framework\Event\Dispatch\Envelope;
+use HongXunPan\Framework\Event\Dispatch\EventMessage;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Listener\ShouldQueue;
@@ -25,8 +25,8 @@ final readonly class SymfonySerializer implements Serializer
     private const string DATE_FORMAT = 'Y-m-d\TH:i:s.uP';
 
     /** @var list<string> */
-    private const array ENVELOPE_FIELDS = [
-        'envelope_version',
+    private const array MESSAGE_FIELDS = [
+        'message_version',
         'event_id',
         'occurred_at',
         'trace_id',
@@ -52,68 +52,68 @@ final readonly class SymfonySerializer implements Serializer
         );
     }
 
-    public function serialize(Envelope $envelope): string
+    public function serialize(EventMessage $message): string
     {
-        if ($envelope->envelopeVersion !== Envelope::CURRENT_ENVELOPE_VERSION) {
-            throw new UnexpectedValueException("不支持的 Envelope 版本：{$envelope->envelopeVersion}");
+        if ($message->messageVersion !== EventMessage::VERSION) {
+            throw new UnexpectedValueException("不支持的 EventMessage 版本：{$message->messageVersion}");
         }
-        if ($envelope->eventId === '') {
+        if ($message->eventId === '') {
             throw new UnexpectedValueException('Event event_id 必须是非空字符串');
         }
-        if ($envelope->traceId !== null && $envelope->traceId === '') {
+        if ($message->traceId !== null && $message->traceId === '') {
             throw new UnexpectedValueException('Event trace_id 必须是非空字符串或 null');
         }
 
-        $eventClass = $envelope->event::class;
+        $eventClass = $message->event::class;
         $this->events->validate($eventClass);
-        $this->validateListeners($envelope->listeners, $eventClass);
+        $this->validateListeners($message->listeners, $eventClass);
 
-        $payload = $this->serializer->normalize($envelope->event, 'json');
+        $payload = $this->serializer->normalize($message->event, 'json');
         if (!is_array($payload)) {
             throw new UnexpectedValueException("Event 无法规范化为 JSON 对象：{$eventClass}");
         }
 
         return $this->serializer->encode([
-            'envelope_version' => $envelope->envelopeVersion,
-            'event_id' => $envelope->eventId,
-            'occurred_at' => $envelope->occurredAt->format(self::DATE_FORMAT),
-            'trace_id' => $envelope->traceId,
+            'message_version' => $message->messageVersion,
+            'event_id' => $message->eventId,
+            'occurred_at' => $message->occurredAt->format(self::DATE_FORMAT),
+            'trace_id' => $message->traceId,
             'event_class' => $eventClass,
             'event_version' => $this->events->versionOf($eventClass),
-            'listeners' => $envelope->listeners,
+            'listeners' => $message->listeners,
             'payload' => $payload === [] ? new stdClass() : $payload,
         ], 'json', [
             JsonEncode::OPTIONS => JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
         ]);
     }
 
-    public function deserialize(string $payload): Envelope
+    public function deserialize(string $payload): EventMessage
     {
-        $message = $this->serializer->decode($payload, 'json');
-        if (!is_array($message)) {
+        $data = $this->serializer->decode($payload, 'json');
+        if (!is_array($data)) {
             throw new UnexpectedValueException('Event JSON 顶层必须是对象');
         }
-        $this->assertExactFields($message, self::ENVELOPE_FIELDS, 'Event Envelope');
+        $this->assertExactFields($data, self::MESSAGE_FIELDS, 'EventMessage');
 
-        $envelopeVersion = $this->positiveInt($message, 'envelope_version');
-        if ($envelopeVersion !== Envelope::CURRENT_ENVELOPE_VERSION) {
-            throw new UnexpectedValueException("不支持的 Envelope 版本：{$envelopeVersion}");
+        $messageVersion = $this->positiveInt($data, 'message_version');
+        if ($messageVersion !== EventMessage::VERSION) {
+            throw new UnexpectedValueException("不支持的 EventMessage 版本：{$messageVersion}");
         }
 
-        $eventClass = $this->nonEmptyString($message, 'event_class');
+        $eventClass = $this->nonEmptyString($data, 'event_class');
         $this->events->validate($eventClass);
-        $eventVersion = $this->positiveInt($message, 'event_version');
+        $eventVersion = $this->positiveInt($data, 'event_version');
         if ($eventVersion !== $this->events->versionOf($eventClass)) {
             throw new UnexpectedValueException("不支持的 Event 版本：{$eventClass} v{$eventVersion}");
         }
 
-        $listeners = $message['listeners'];
+        $listeners = $data['listeners'];
         if (!is_array($listeners) || !array_is_list($listeners)) {
             throw new UnexpectedValueException('Event listeners 必须是 JSON 列表');
         }
         $this->validateListeners($listeners, $eventClass);
 
-        $eventPayload = $message['payload'];
+        $eventPayload = $data['payload'];
         if (!is_array($eventPayload)) {
             throw new UnexpectedValueException('Event payload 必须是 JSON 对象');
         }
@@ -128,18 +128,18 @@ final readonly class SymfonySerializer implements Serializer
             throw new UnexpectedValueException("反序列化结果不是 Event：{$eventClass}");
         }
 
-        $traceId = $message['trace_id'];
+        $traceId = $data['trace_id'];
         if ($traceId !== null && (!is_string($traceId) || $traceId === '')) {
             throw new UnexpectedValueException('Event trace_id 必须是非空字符串或 null');
         }
 
-        return new Envelope(
-            eventId: $this->nonEmptyString($message, 'event_id'),
-            occurredAt: $this->dateTime($message, 'occurred_at'),
+        return new EventMessage(
+            eventId: $this->nonEmptyString($data, 'event_id'),
+            occurredAt: $this->dateTime($data, 'occurred_at'),
             event: $event,
             listeners: $listeners,
             traceId: $traceId,
-            envelopeVersion: $envelopeVersion,
+            messageVersion: $messageVersion,
         );
     }
 

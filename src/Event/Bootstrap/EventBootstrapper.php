@@ -15,7 +15,7 @@ use HongXunPan\Framework\Event\Serialization\SymfonySerializer;
 use HongXunPan\Framework\Event\Validation\ConfigValidator;
 use HongXunPan\Framework\Event\Validation\EventValidator;
 use HongXunPan\Framework\Event\Validation\ListenerValidator;
-use HongXunPan\Framework\Event\Worker\EnvelopeRunner;
+use HongXunPan\Framework\Event\Worker\EventMessageExecutor;
 use HongXunPan\Framework\Event\Worker\EventWorker;
 
 final class EventBootstrapper
@@ -46,7 +46,7 @@ final class EventBootstrapper
             $consumerClass = $config->resolveConsumerClass($driverClass);
             app()->singleton(Driver::class, $driverClass);
             app()->singleton(Consumer::class, $consumerClass);
-            app()->singleton(EnvelopeRunner::class);
+            app()->singleton(EventMessageExecutor::class);
             app()->singleton(EventWorker::class);
         }
 

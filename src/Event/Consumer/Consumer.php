@@ -8,10 +8,10 @@ use HongXunPan\Framework\Event\Execution\Failure;
 
 interface Consumer
 {
-    /** @return iterable<Message> */
+    /** @return iterable<ReceivedMessage> */
     public function receive(): iterable;
 
-    public function acknowledge(Message $message): void;
+    public function acknowledge(ReceivedMessage $message): void;
 
-    public function fail(Message $message, Failure $failure): void;
+    public function fail(ReceivedMessage $message, Failure $failure): void;
 }

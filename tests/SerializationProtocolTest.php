@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use HongXunPan\Framework\Event\Dispatch\Envelope;
+use HongXunPan\Framework\Event\Dispatch\EventMessage;
 use HongXunPan\Framework\Event\Listener\ShouldQueue;
 use HongXunPan\Framework\Event\Serialization\SymfonySerializer;
 use HongXunPan\Framework\Event\Validation\EventValidator;
@@ -19,7 +19,7 @@ final readonly class WrongEventSerializationQueuedListener implements ShouldQueu
 function strictSerializationMessage(): array
 {
     $serializer = new SymfonySerializer(new EventValidator(), new ListenerValidator());
-    $json = $serializer->serialize(new Envelope(
+    $json = $serializer->serialize(new EventMessage(
         eventId: 'event-strict-protocol',
         occurredAt: new DateTimeImmutable('2026-07-11T12:35:00+08:00'),
         event: new SerializableOccurred(
@@ -60,18 +60,18 @@ $runProtocol = static function (string $name, callable $test) use (&$protocolFai
     }
 };
 
-$runProtocol('反序列化拒绝 Envelope 顶层字段漂移', static function () use ($protocolAssertThrows): void {
+$runProtocol('反序列化拒绝 EventMessage 顶层字段漂移', static function () use ($protocolAssertThrows): void {
     [$serializer, $message] = strictSerializationMessage();
     $message['unexpected'] = true;
     $protocolAssertThrows(
         static fn () => $serializer->deserialize(json_encode($message, JSON_THROW_ON_ERROR)),
-        'Envelope 多余字段未被拒绝',
+        'EventMessage 多余字段未被拒绝',
     );
 
     unset($message['unexpected'], $message['trace_id']);
     $protocolAssertThrows(
         static fn () => $serializer->deserialize(json_encode($message, JSON_THROW_ON_ERROR)),
-        'Envelope 缺失字段未被拒绝',
+        'EventMessage 缺失字段未被拒绝',
     );
 });
 

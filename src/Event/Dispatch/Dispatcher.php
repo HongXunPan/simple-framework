@@ -55,7 +55,7 @@ final readonly class Dispatcher
             return;
         }
 
-        app(Driver::class)->publish(new Envelope(
+        app(Driver::class)->publish(new EventMessage(
             eventId: bin2hex(random_bytes(16)),
             occurredAt: new DateTimeImmutable(),
             event: $event,

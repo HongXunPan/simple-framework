@@ -14,7 +14,7 @@ final readonly class Failure
 
     /**
      * @param class-string<Event>|null $eventClass
-     * @param list<ListenerExecutionResult> $listeners
+     * @param list<ListenerResult> $listeners
      * @param class-string<Throwable>|null $errorClass
      */
     public function __construct(
@@ -57,7 +57,7 @@ final readonly class Failure
             'queued_at' => $this->queuedAt?->format(self::DATE_FORMAT),
             'listener_total' => count($this->listeners),
             'listeners' => array_map(
-                static fn (ListenerExecutionResult $listener): array => $listener->toArray(),
+                static fn (ListenerResult $listener): array => $listener->toArray(),
                 $this->listeners,
             ),
             'error_class' => $this->errorClass,

@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace HongXunPan\Framework\Event\Worker;
 
 use DateTimeImmutable;
-use HongXunPan\Framework\Event\Dispatch\Envelope;
-use HongXunPan\Framework\Event\Execution\EnvelopeExecutionResult;
+use HongXunPan\Framework\Event\Dispatch\EventMessage;
 use HongXunPan\Framework\Event\Execution\ErrorMessageSanitizer;
-use HongXunPan\Framework\Event\Execution\ListenerExecutionResult;
+use HongXunPan\Framework\Event\Execution\EventResult;
+use HongXunPan\Framework\Event\Execution\ListenerResult;
 use HongXunPan\Framework\Event\Listener\ListenerCaller;
 use Throwable;
 
-final readonly class EnvelopeRunner
+final readonly class EventMessageExecutor
 {
     public function __construct(
         private ListenerCaller $caller,
@@ -20,16 +20,16 @@ final readonly class EnvelopeRunner
     ) {
     }
 
-    public function run(Envelope $envelope): EnvelopeExecutionResult
+    public function run(EventMessage $message): EventResult
     {
         $results = [];
-        foreach ($envelope->listeners as $index => $listenerClass) {
+        foreach ($message->listeners as $index => $listenerClass) {
             $startedAt = new DateTimeImmutable();
             $startedAtTick = hrtime(true);
 
             try {
-                $this->caller->call($listenerClass, $envelope->event);
-                $results[] = new ListenerExecutionResult(
+                $this->caller->call($listenerClass, $message->event);
+                $results[] = new ListenerResult(
                     listenerClass: $listenerClass,
                     order: $index + 1,
                     startedAt: $startedAt,
@@ -38,7 +38,7 @@ final readonly class EnvelopeRunner
                     succeeded: true,
                 );
             } catch (Throwable $throwable) {
-                $results[] = new ListenerExecutionResult(
+                $results[] = new ListenerResult(
                     listenerClass: $listenerClass,
                     order: $index + 1,
                     startedAt: $startedAt,
@@ -51,7 +51,7 @@ final readonly class EnvelopeRunner
             }
         }
 
-        return new EnvelopeExecutionResult($results);
+        return new EventResult($results);
     }
 
     private function elapsedMs(int $startedAt): int

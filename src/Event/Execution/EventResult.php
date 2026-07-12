@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace HongXunPan\Framework\Event\Execution;
 
-final readonly class EnvelopeExecutionResult
+final readonly class EventResult
 {
-    /** @param list<ListenerExecutionResult> $listeners */
+    /** @param list<ListenerResult> $listeners */
     public function __construct(public array $listeners)
     {
     }

@@ -6,7 +6,7 @@ namespace HongXunPan\Framework\Event\Execution;
 
 use DateTimeImmutable;
 
-final readonly class ListenerExecutionResult
+final readonly class ListenerResult
 {
     private const string DATE_FORMAT = 'Y-m-d\TH:i:s.uP';
 

@@ -8,9 +8,9 @@ use DateTimeImmutable;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Listener\ShouldQueue;
 
-final readonly class Envelope
+final readonly class EventMessage
 {
-    public const int CURRENT_ENVELOPE_VERSION = 1;
+    public const int VERSION = 1;
 
     /**
      * @param list<class-string<ShouldQueue>> $listeners
@@ -21,7 +21,7 @@ final readonly class Envelope
         public Event $event,
         public array $listeners,
         public ?string $traceId = null,
-        public int $envelopeVersion = self::CURRENT_ENVELOPE_VERSION,
+        public int $messageVersion = self::VERSION,
     ) {
     }
 }

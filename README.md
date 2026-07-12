@@ -132,7 +132,7 @@ event(new AlumniCardApproved(
 ));
 ```
 
-触发端不区分同步或异步。同步 listener 全部成功后，Dispatcher 才发布包含全部异步 listener 的唯一 Envelope。
+触发端不区分同步或异步。同步 listener 全部成功后，Dispatcher 才发布包含全部异步 listener 的唯一 EventMessage。
 
 MVP 没有事务协调器。涉及数据库事务时，应在事务成功返回后调用 `event(...)`；数据库提交后、Redis 发布前仍存在已接受的丢失窗口。
 

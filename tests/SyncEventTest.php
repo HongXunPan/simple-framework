@@ -8,10 +8,10 @@ use HongXunPan\Framework\Core\Application;
 use HongXunPan\Framework\Core\Request;
 use HongXunPan\Framework\Event\Bootstrap\EventBootstrapper;
 use HongXunPan\Framework\Event\Consumer\Consumer;
-use HongXunPan\Framework\Event\Consumer\Message;
+use HongXunPan\Framework\Event\Consumer\ReceivedMessage;
 use HongXunPan\Framework\Event\Execution\Failure;
 use HongXunPan\Framework\Event\Dispatch\Dispatcher;
-use HongXunPan\Framework\Event\Dispatch\Envelope;
+use HongXunPan\Framework\Event\Dispatch\EventMessage;
 use HongXunPan\Framework\Event\Driver\Driver;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
@@ -99,8 +99,8 @@ final readonly class SecondQueuedListener implements ShouldQueue
 
 final class FakeDriver implements Driver
 {
-    /** @var list<Envelope> */
-    public array $envelopes = [];
+    /** @var list<EventMessage> */
+    public array $messages = [];
 
     public static function validateConfig(array $config): void
     {
@@ -111,9 +111,9 @@ final class FakeDriver implements Driver
         return SyncFakeConsumer::class;
     }
 
-    public function publish(Envelope $envelope): void
+    public function publish(EventMessage $message): void
     {
-        $this->envelopes[] = $envelope;
+        $this->messages[] = $message;
     }
 }
 
@@ -124,11 +124,11 @@ final class SyncFakeConsumer implements Consumer
         return [];
     }
 
-    public function acknowledge(Message $message): void
+    public function acknowledge(ReceivedMessage $message): void
     {
     }
 
-    public function fail(Message $message, Failure $failure): void
+    public function fail(ReceivedMessage $message, Failure $failure): void
     {
     }
 }
@@ -144,7 +144,7 @@ final class InvalidConsumerDriver implements Driver
         return InvalidDriver::class;
     }
 
-    public function publish(Envelope $envelope): void
+    public function publish(EventMessage $message): void
     {
     }
 }
@@ -161,7 +161,7 @@ final class RejectingConfigDriver implements Driver
         return SyncFakeConsumer::class;
     }
 
-    public function publish(Envelope $envelope): void
+    public function publish(EventMessage $message): void
     {
     }
 }
@@ -315,7 +315,7 @@ $run('手动注册异步监听器时复用已配置 Driver', static function () 
 
     /** @var FakeDriver $driver */
     $driver = app(Driver::class);
-    $assertSame(1, count($driver->envelopes), '手动异步注册未发布唯一事件总消息');
+    $assertSame(1, count($driver->messages), '手动异步注册未发布唯一事件总消息');
 });
 
 $run('Driver 声明的 Consumer 由启动器自动绑定', static function () use ($assertSame): void {
@@ -369,17 +369,17 @@ $run('单个异步监听器只发布一个事件总消息', static function () u
     /** @var FakeDriver $driver */
     $driver = app(Driver::class);
     $assertSame([], $log->entries, '异步监听器不应在 dispatch 进程内执行');
-    $assertSame(1, count($driver->envelopes), '单个异步监听器应只发布一次');
-    $assertSame($event, $driver->envelopes[0]->event, 'Envelope 未保留当前事件实例');
+    $assertSame(1, count($driver->messages), '单个异步监听器应只发布一次');
+    $assertSame($event, $driver->messages[0]->event, 'EventMessage 未保留当前事件实例');
     $assertSame(
         app(Request::class)->requestId,
-        $driver->envelopes[0]->traceId,
-        'Envelope 未继承当前请求 requestId',
+        $driver->messages[0]->traceId,
+        'EventMessage 未继承当前请求 requestId',
     );
     $assertSame(
         [FirstQueuedListener::class],
-        $driver->envelopes[0]->listeners,
-        'Envelope 的异步监听器列表错误',
+        $driver->messages[0]->listeners,
+        'EventMessage 的异步监听器列表错误',
     );
 });
 
@@ -394,10 +394,10 @@ $run('多个异步监听器合并为一个有序事件总消息', static functio
     /** @var FakeDriver $driver */
     $driver = app(Driver::class);
     $assertSame([], $log->entries, '异步监听器不应被本地执行');
-    $assertSame(1, count($driver->envelopes), '多个异步监听器不应拆成多条消息');
+    $assertSame(1, count($driver->messages), '多个异步监听器不应拆成多条消息');
     $assertSame(
         [FirstQueuedListener::class, SecondQueuedListener::class],
-        $driver->envelopes[0]->listeners,
+        $driver->messages[0]->listeners,
         '异步监听器声明顺序未被保留',
     );
 });
@@ -413,10 +413,10 @@ $run('同步监听器执行完成后再发布异步事件总消息', static func
     /** @var FakeDriver $driver */
     $driver = app(Driver::class);
     $assertSame(['first:mixed', 'second:mixed'], $log->entries, '同步监听器执行结果错误');
-    $assertSame(1, count($driver->envelopes), '混合分发未生成唯一异步消息');
+    $assertSame(1, count($driver->messages), '混合分发未生成唯一异步消息');
     $assertSame(
         [FirstQueuedListener::class, SecondQueuedListener::class],
-        $driver->envelopes[0]->listeners,
+        $driver->messages[0]->listeners,
         '混合分发未保持异步监听器声明顺序',
     );
 });
@@ -435,7 +435,7 @@ $run('同步监听器失败时不发布异步消息', static function () use ($a
 
     /** @var FakeDriver $driver */
     $driver = app(Driver::class);
-    $assertSame([], $driver->envelopes, '同步失败后仍发布了异步消息');
+    $assertSame([], $driver->messages, '同步失败后仍发布了异步消息');
 });
 
 $run('异步监听器缺少 Driver 配置时启动失败', static function () use ($assertThrows): void {
