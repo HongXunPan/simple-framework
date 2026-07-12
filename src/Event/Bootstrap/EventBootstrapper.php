@@ -14,6 +14,7 @@ use HongXunPan\Framework\Event\Serialization\Serializer;
 use HongXunPan\Framework\Event\Serialization\SymfonySerializer;
 use HongXunPan\Framework\Event\Validation\ConfigValidator;
 use HongXunPan\Framework\Event\Validation\EventValidator;
+use HongXunPan\Framework\Event\Validation\ListenerValidator;
 use HongXunPan\Framework\Event\Worker\EnvelopeRunner;
 use HongXunPan\Framework\Event\Worker\EventWorker;
 
@@ -22,6 +23,7 @@ final class EventBootstrapper
     public static function boot(): void
     {
         app()->singleton(EventValidator::class);
+        app()->singleton(ListenerValidator::class);
         app()->singleton(ConfigValidator::class);
         app()->singleton(Serializer::class, SymfonySerializer::class);
         app()->singleton(ErrorMessageSanitizer::class);

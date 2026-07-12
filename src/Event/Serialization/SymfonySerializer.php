@@ -7,8 +7,10 @@ namespace HongXunPan\Framework\Event\Serialization;
 use DateTimeImmutable;
 use HongXunPan\Framework\Event\Dispatch\Envelope;
 use HongXunPan\Framework\Event\Event;
+use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Listener\ShouldQueue;
 use HongXunPan\Framework\Event\Validation\EventValidator;
+use HongXunPan\Framework\Event\Validation\ListenerValidator;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Encoder\JsonEncode;
 use Symfony\Component\Serializer\Normalizer\BackedEnumNormalizer;
@@ -22,10 +24,24 @@ final readonly class SymfonySerializer implements Serializer
 {
     private const string DATE_FORMAT = 'Y-m-d\TH:i:s.uP';
 
+    /** @var list<string> */
+    private const array ENVELOPE_FIELDS = [
+        'envelope_version',
+        'event_id',
+        'occurred_at',
+        'trace_id',
+        'event_class',
+        'event_version',
+        'listeners',
+        'payload',
+    ];
+
     private SymfonyComponentSerializer $serializer;
 
-    public function __construct(private EventValidator $events)
-    {
+    public function __construct(
+        private EventValidator $events,
+        private ListenerValidator $listeners,
+    ) {
         $this->serializer = new SymfonyComponentSerializer(
             [
                 new DateTimeNormalizer([DateTimeNormalizer::FORMAT_KEY => self::DATE_FORMAT]),
@@ -50,7 +66,7 @@ final readonly class SymfonySerializer implements Serializer
 
         $eventClass = $envelope->event::class;
         $this->events->validate($eventClass);
-        $this->validateListeners($envelope->listeners);
+        $this->validateListeners($envelope->listeners, $eventClass);
 
         $payload = $this->serializer->normalize($envelope->event, 'json');
         if (!is_array($payload)) {
@@ -77,6 +93,7 @@ final readonly class SymfonySerializer implements Serializer
         if (!is_array($message)) {
             throw new UnexpectedValueException('Event JSON 顶层必须是对象');
         }
+        $this->assertExactFields($message, self::ENVELOPE_FIELDS, 'Event Envelope');
 
         $envelopeVersion = $this->positiveInt($message, 'envelope_version');
         if ($envelopeVersion !== Envelope::CURRENT_ENVELOPE_VERSION) {
@@ -90,23 +107,28 @@ final readonly class SymfonySerializer implements Serializer
             throw new UnexpectedValueException("不支持的 Event 版本：{$eventClass} v{$eventVersion}");
         }
 
-        $eventPayload = $message['payload'] ?? null;
+        $listeners = $message['listeners'];
+        if (!is_array($listeners) || !array_is_list($listeners)) {
+            throw new UnexpectedValueException('Event listeners 必须是 JSON 列表');
+        }
+        $this->validateListeners($listeners, $eventClass);
+
+        $eventPayload = $message['payload'];
         if (!is_array($eventPayload)) {
             throw new UnexpectedValueException('Event payload 必须是 JSON 对象');
         }
+        $this->assertExactFields(
+            $eventPayload,
+            $this->events->snapshotFieldsOf($eventClass),
+            "Event payload ({$eventClass})",
+        );
 
         $event = $this->serializer->denormalize($eventPayload, $eventClass, 'json');
         if (!$event instanceof Event) {
             throw new UnexpectedValueException("反序列化结果不是 Event：{$eventClass}");
         }
 
-        $listeners = $message['listeners'] ?? null;
-        if (!is_array($listeners) || !array_is_list($listeners)) {
-            throw new UnexpectedValueException('Event listeners 必须是 JSON 列表');
-        }
-        $this->validateListeners($listeners);
-
-        $traceId = $message['trace_id'] ?? null;
+        $traceId = $message['trace_id'];
         if ($traceId !== null && (!is_string($traceId) || $traceId === '')) {
             throw new UnexpectedValueException('Event trace_id 必须是非空字符串或 null');
         }
@@ -163,18 +185,60 @@ final readonly class SymfonySerializer implements Serializer
         return $dateTime;
     }
 
-    /** @param array<mixed> $listeners */
-    private function validateListeners(array $listeners): void
+    /**
+     * @param array<mixed> $listeners
+     * @param class-string<Event> $eventClass
+     */
+    private function validateListeners(array $listeners, string $eventClass): void
     {
         if ($listeners === [] || !array_is_list($listeners)) {
             throw new UnexpectedValueException('Event listeners 必须是非空列表');
         }
 
+        $validated = [];
         foreach ($listeners as $listenerClass) {
             if (!is_string($listenerClass) || !class_exists($listenerClass)
                 || !is_a($listenerClass, ShouldQueue::class, true)) {
                 throw new UnexpectedValueException('Event listeners 只能包含 ShouldQueue 监听器类名');
             }
+            if (isset($validated[$listenerClass])) {
+                throw new UnexpectedValueException("Event listener 不得重复：{$listenerClass}");
+            }
+
+            try {
+                $this->listeners->validate($listenerClass, $eventClass);
+            } catch (EventConfigException $exception) {
+                throw new UnexpectedValueException(
+                    "Event listener 与事件契约不匹配：{$eventClass} -> {$listenerClass}",
+                    previous: $exception,
+                );
+            }
+
+            $validated[$listenerClass] = true;
         }
+    }
+
+    /**
+     * @param array<mixed> $payload
+     * @param list<string> $expectedFields
+     */
+    private function assertExactFields(array $payload, array $expectedFields, string $subject): void
+    {
+        $actualFields = array_keys($payload);
+        $missing = array_values(array_diff($expectedFields, $actualFields));
+        $extra = array_values(array_diff($actualFields, $expectedFields));
+        if ($missing === [] && $extra === []) {
+            return;
+        }
+
+        $details = [];
+        if ($missing !== []) {
+            $details[] = '缺少：' . implode(', ', $missing);
+        }
+        if ($extra !== []) {
+            $details[] = '多余：' . implode(', ', $extra);
+        }
+
+        throw new UnexpectedValueException("{$subject} 字段必须精确匹配（" . implode('；', $details) . '）');
     }
 }

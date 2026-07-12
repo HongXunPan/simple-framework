@@ -18,6 +18,9 @@ final class EventValidator
     /** @var array<class-string<Event>, true> */
     private array $validated = [];
 
+    /** @var array<class-string<Event>, list<string>> */
+    private array $snapshotFields = [];
+
     /** @param class-string $eventClass */
     public function validate(string $eventClass): void
     {
@@ -36,9 +39,20 @@ final class EventValidator
             throw new EventConfigException("事件类必须声明为 final readonly：{$eventClass}");
         }
 
-        $this->validateSnapshot($event);
+        $this->snapshotFields[$eventClass] = $this->validateSnapshot($event);
         $this->readVersion($event);
         $this->validated[$eventClass] = true;
+    }
+
+    /**
+     * @param class-string<Event> $eventClass
+     * @return list<string>
+     */
+    public function snapshotFieldsOf(string $eventClass): array
+    {
+        $this->validate($eventClass);
+
+        return $this->snapshotFields[$eventClass];
     }
 
     /** @param class-string<Event> $eventClass */
@@ -49,8 +63,11 @@ final class EventValidator
         return $this->readVersion(new ReflectionClass($eventClass));
     }
 
-    /** @param ReflectionClass<Event> $event */
-    private function validateSnapshot(ReflectionClass $event): void
+    /**
+     * @param ReflectionClass<Event> $event
+     * @return list<string>
+     */
+    private function validateSnapshot(ReflectionClass $event): array
     {
         $properties = [];
         foreach ($event->getProperties() as $property) {
@@ -70,7 +87,7 @@ final class EventValidator
                 throw new EventConfigException("有快照属性的 Event 必须声明构造方法：{$event->getName()}");
             }
 
-            return;
+            return [];
         }
 
         $parameters = [];
@@ -94,6 +111,8 @@ final class EventValidator
                 );
             }
         }
+
+        return array_keys($properties);
     }
 
     private function validatePropertyType(string $eventClass, ReflectionProperty $property): void
