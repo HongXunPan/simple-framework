@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 use HongXunPan\Framework\Core\Application;
+use HongXunPan\Framework\Core\Request;
 use HongXunPan\Framework\Event\Bootstrap\EventBootstrapper;
 use HongXunPan\Framework\Event\Consumer\Consumer;
 use HongXunPan\Framework\Event\Consumer\Message;
@@ -203,7 +204,7 @@ function bootApplication(
 
     Config::$config = [
         'app' => ['timezone' => 'Asia/Shanghai'],
-        'singleton' => [],
+        'singleton' => [Request::class],
         'boot' => [
             [EventBootstrapper::class, 'boot'],
         ],
@@ -370,6 +371,11 @@ $run('单个异步监听器只发布一个事件总消息', static function () u
     $assertSame([], $log->entries, '异步监听器不应在 dispatch 进程内执行');
     $assertSame(1, count($driver->envelopes), '单个异步监听器应只发布一次');
     $assertSame($event, $driver->envelopes[0]->event, 'Envelope 未保留当前事件实例');
+    $assertSame(
+        app(Request::class)->requestId,
+        $driver->envelopes[0]->traceId,
+        'Envelope 未继承当前请求 requestId',
+    );
     $assertSame(
         [FirstQueuedListener::class],
         $driver->envelopes[0]->listeners,

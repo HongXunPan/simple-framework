@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HongXunPan\Framework\Event\Dispatch;
 
 use DateTimeImmutable;
+use HongXunPan\Framework\Core\Request;
 use HongXunPan\Framework\Event\Driver\Driver;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
@@ -17,6 +18,7 @@ final readonly class Dispatcher
     public function __construct(
         private ListenerRegistry $listeners,
         private ListenerCaller $caller,
+        private Request $request,
     ) {
     }
 
@@ -58,6 +60,7 @@ final readonly class Dispatcher
             occurredAt: new DateTimeImmutable(),
             event: $event,
             listeners: $queuedListeners,
+            traceId: $this->request->requestId,
         ));
     }
 }

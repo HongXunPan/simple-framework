@@ -100,8 +100,11 @@ final class RedisStreamConsumer implements Consumer
     private function serializeFailure(Failure $failure): string
     {
         try {
+            $payload = $failure->toArray();
+            $payload['consumer'] = $this->consumer;
+
             return json_encode(
-                $failure->toArray(),
+                $payload,
                 JSON_THROW_ON_ERROR
                 | JSON_UNESCAPED_SLASHES
                 | JSON_UNESCAPED_UNICODE

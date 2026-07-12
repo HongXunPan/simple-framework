@@ -155,6 +155,7 @@ function contractEnvelope(array $listeners): ContractEnvelope
         occurredAt: new DateTimeImmutable(),
         event: new ContractWorkerOccurred('contract'),
         listeners: $listeners,
+        traceId: 'trace-contract-1',
     );
 }
 
@@ -258,7 +259,21 @@ $runContractWorker('EventWorker 将 listener 失败交给 Consumer', static func
 
     $failure = $context['consumer']->failed[0]['failure'];
     $contractWorkerAssertSame('message-1', $failure->messageId, 'Failure 消息 ID 错误');
+    $contractWorkerAssertSame('trace-contract-1', $failure->traceId, 'Failure 未保留 trace ID');
     $contractWorkerAssertSame(false, $failure->listeners[0]->succeeded, 'Failure 缺少 listener 结果');
+    $failurePayload = $failure->toArray();
+    $contractWorkerAssertSame('failed', $failurePayload['listeners'][0]['status'], 'listener 终态错误');
+    $contractWorkerAssertSame(false, $failurePayload['queued_at'] === null, 'Failure 缺少入队时间');
+    $contractWorkerAssertSame(
+        false,
+        empty($failurePayload['listeners'][0]['started_at']),
+        'Failure 缺少 listener 开始时间',
+    );
+    $contractWorkerAssertSame(
+        false,
+        empty($failurePayload['listeners'][0]['finished_at']),
+        'Failure 缺少 listener 结束时间',
+    );
 });
 
 $runContractWorker('EventWorker 将反序列化失败交给 Consumer', static function () use (

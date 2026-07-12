@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HongXunPan\Framework\Event\Worker;
 
+use DateTimeImmutable;
 use HongXunPan\Framework\Event\Dispatch\Envelope;
 use HongXunPan\Framework\Event\Execution\EnvelopeExecutionResult;
 use HongXunPan\Framework\Event\Execution\ErrorMessageSanitizer;
@@ -23,21 +24,26 @@ final readonly class EnvelopeRunner
     {
         $results = [];
         foreach ($envelope->listeners as $index => $listenerClass) {
-            $startedAt = hrtime(true);
+            $startedAt = new DateTimeImmutable();
+            $startedAtTick = hrtime(true);
 
             try {
                 $this->caller->call($listenerClass, $envelope->event);
                 $results[] = new ListenerExecutionResult(
                     listenerClass: $listenerClass,
                     order: $index + 1,
-                    elapsedMs: $this->elapsedMs($startedAt),
+                    startedAt: $startedAt,
+                    finishedAt: new DateTimeImmutable(),
+                    elapsedMs: $this->elapsedMs($startedAtTick),
                     succeeded: true,
                 );
             } catch (Throwable $throwable) {
                 $results[] = new ListenerExecutionResult(
                     listenerClass: $listenerClass,
                     order: $index + 1,
-                    elapsedMs: $this->elapsedMs($startedAt),
+                    startedAt: $startedAt,
+                    finishedAt: new DateTimeImmutable(),
+                    elapsedMs: $this->elapsedMs($startedAtTick),
                     succeeded: false,
                     errorClass: $throwable::class,
                     errorMessage: $this->errors->sanitize($throwable->getMessage()),

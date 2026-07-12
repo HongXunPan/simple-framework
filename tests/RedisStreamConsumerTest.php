@@ -357,10 +357,18 @@ $runWorker('listener 失败后继续执行并写入 failed stream', static funct
             '失败摘要未保存原始消息 ID',
         );
         $workerAssertSame(3, $failure['listener_total'], '失败摘要 listener 总数错误');
+        $workerAssertSame(false, empty($failure['trace_id']), '失败摘要未保留 trace ID');
+        $workerAssertSame(false, empty($failure['queued_at']), '失败摘要未保留入队时间');
+        $workerAssertSame(false, empty($failure['consumer']), '失败摘要未保留 Redis consumer');
         $workerAssertSame(
             [true, false, true],
             array_column($failure['listeners'], 'succeeded'),
             '失败摘要未保留逐 listener 结果',
+        );
+        $workerAssertSame(
+            ['succeeded', 'failed', 'succeeded'],
+            array_column($failure['listeners'], 'status'),
+            '失败摘要未保留逐 listener 终态',
         );
         $workerAssertSame(
             'token=[REDACTED] mobile=1**********',

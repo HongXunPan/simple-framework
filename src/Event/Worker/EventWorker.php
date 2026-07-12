@@ -82,6 +82,8 @@ final readonly class EventWorker
                 eventId: $envelope?->eventId,
                 eventClass: $envelope === null ? null : $envelope->event::class,
                 eventVersion: $envelope === null ? null : $this->events->versionOf($envelope->event::class),
+                traceId: $envelope?->traceId,
+                queuedAt: $envelope?->occurredAt,
                 listeners: $result?->listeners ?? [],
                 errorClass: $throwable === null ? null : $throwable::class,
                 errorMessage: $throwable === null
