@@ -14,6 +14,7 @@ composer require hongxunpan/simple-framework
 
 - 同步 listener；
 - Redis Streams 异步 listener；
+- 显式 best-effort listener 失败策略；
 - Symfony JSON 持久化协议；
 - Consumer Group、pending 回收和 failed stream；
 - 一个 Event 对应一条异步消息，消息内冻结全部异步 listener。
@@ -74,6 +75,25 @@ final class SendApprovalNotification implements ShouldQueue
 ```
 
 listener 必须声明公开实例方法 `handle(具体 Event $event): void`。单个 Event 和 listener 均不配置 driver、channel、stream 或重试参数。
+
+对不应污染业务调用链的非关键副作用，显式实现 `ShouldHandleBestEffort`：
+
+```php
+use HongXunPan\Framework\Event\Listener\ShouldHandleBestEffort;
+use HongXunPan\Framework\Event\Listener\ShouldQueue;
+
+final class SendApprovalNotification implements ShouldQueue, ShouldHandleBestEffort
+{
+    public function handle(AlumniCardApproved $event): void
+    {
+        // 异常会被上报，但不会让同步调用失败或让异步消息进入失败流。
+    }
+}
+```
+
+普通同步 listener 仍保持异常向上传播；普通异步 listener 失败仍进入 failed stream。best-effort 只改变显式 marker listener 的失败策略：同步阶段继续后续 listener，异步阶段完成上报后 ACK。
+
+框架默认使用 `ErrorLogListenerFailureReporter` 输出已清洗的 listener、Event 和异常摘要。业务仓可以在 `config/singleton.php` 绑定自己的 `ListenerFailureReporter` 实现；失败上报器自身异常也不会污染业务调用链。
 
 ### 3. 配置 Event
 

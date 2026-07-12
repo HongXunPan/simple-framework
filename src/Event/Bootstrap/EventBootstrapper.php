@@ -9,6 +9,9 @@ use HongXunPan\Framework\Event\Dispatch\Dispatcher;
 use HongXunPan\Framework\Event\Driver\Driver;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Execution\ErrorMessageSanitizer;
+use HongXunPan\Framework\Event\Listener\ErrorLogListenerFailureReporter;
+use HongXunPan\Framework\Event\Listener\ListenerFailureReporter;
+use HongXunPan\Framework\Event\Listener\ListenerInvoker;
 use HongXunPan\Framework\Event\Listener\ListenerRegistry;
 use HongXunPan\Framework\Event\Serialization\Serializer;
 use HongXunPan\Framework\Event\Serialization\SymfonySerializer;
@@ -27,6 +30,13 @@ final class EventBootstrapper
         app()->singleton(ConfigValidator::class);
         app()->singleton(Serializer::class, SymfonySerializer::class);
         app()->singleton(ErrorMessageSanitizer::class);
+        if (!app()->bound(ListenerFailureReporter::class)) {
+            app()->singleton(
+                ListenerFailureReporter::class,
+                ErrorLogListenerFailureReporter::class,
+            );
+        }
+        app()->singleton(ListenerInvoker::class);
         app()->singleton(ListenerRegistry::class);
         app()->singleton(Dispatcher::class);
 

@@ -15,6 +15,8 @@ use HongXunPan\Framework\Event\Message\EventMessage;
 use HongXunPan\Framework\Event\Driver\Driver;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
+use HongXunPan\Framework\Event\Listener\ListenerFailureReporter;
+use HongXunPan\Framework\Event\Listener\ShouldHandleBestEffort;
 use HongXunPan\Framework\Event\Listener\ShouldQueue;
 use HongXunPan\Tools\Config\Config;
 use HongXunPan\Tools\Env\Env;
@@ -70,6 +72,42 @@ final readonly class ThrowingListener
     {
         $this->log->entries[] = 'throwing:' . $event->name;
         throw new \RuntimeException('监听器执行失败');
+    }
+}
+
+final readonly class BestEffortThrowingListener implements ShouldHandleBestEffort
+{
+    public function __construct(private InvocationLog $log)
+    {
+    }
+
+    public function handle(DemoOccurred $event): void
+    {
+        $this->log->entries[] = 'best-effort:' . $event->name;
+        throw new \RuntimeException('best-effort 监听器执行失败');
+    }
+}
+
+final class RecordingListenerFailureReporter implements ListenerFailureReporter
+{
+    /** @var list<array{listener_class: string, event_class: string, error_class: string}> */
+    public array $reports = [];
+
+    public function report(string $listenerClass, Event $event, \Throwable $throwable): void
+    {
+        $this->reports[] = [
+            'listener_class' => $listenerClass,
+            'event_class' => $event::class,
+            'error_class' => $throwable::class,
+        ];
+    }
+}
+
+final class ThrowingListenerFailureReporter implements ListenerFailureReporter
+{
+    public function report(string $listenerClass, Event $event, \Throwable $throwable): void
+    {
+        throw new \RuntimeException('失败上报器异常');
     }
 }
 
@@ -196,6 +234,7 @@ function bootApplication(
     mixed $listeners = [],
     bool $withEventsConfig = true,
     mixed $driverClass = null,
+    string $failureReporterClass = RecordingListenerFailureReporter::class,
 ): array
 {
     putenv('DEBUG=false');
@@ -204,7 +243,10 @@ function bootApplication(
 
     Config::$config = [
         'app' => ['timezone' => 'Asia/Shanghai'],
-        'singleton' => [Request::class],
+        'singleton' => [
+            Request::class,
+            ListenerFailureReporter::class => $failureReporterClass,
+        ],
         'boot' => [
             [EventBootstrapper::class, 'boot'],
         ],
@@ -354,6 +396,49 @@ $run('同步异常原样传播并停止后续监听器', static function () use 
         ['first:failed', 'throwing:failed'],
         $log->entries,
         '异常后仍执行了后续监听器',
+    );
+});
+
+$run('best-effort 同步异常被上报且不阻断后续监听器', static function () use ($assertSame): void {
+    [, $log] = bootApplication([
+        DemoOccurred::class => [
+            FirstListener::class,
+            BestEffortThrowingListener::class,
+            SecondListener::class,
+        ],
+    ]);
+
+    event(new DemoOccurred('best-effort'));
+
+    $assertSame(
+        ['first:best-effort', 'best-effort:best-effort', 'second:best-effort'],
+        $log->entries,
+        'best-effort 同步异常阻断了后续监听器',
+    );
+    /** @var RecordingListenerFailureReporter $reporter */
+    $reporter = app(ListenerFailureReporter::class);
+    $assertSame(1, count($reporter->reports), 'best-effort 同步异常未上报');
+    $assertSame(
+        BestEffortThrowingListener::class,
+        $reporter->reports[0]['listener_class'],
+        'best-effort 上报缺少 listener 类名',
+    );
+});
+
+$run('best-effort 失败上报器异常不污染同步调用链', static function () use ($assertSame): void {
+    [, $log] = bootApplication(
+        listeners: [
+            DemoOccurred::class => [BestEffortThrowingListener::class, SecondListener::class],
+        ],
+        failureReporterClass: ThrowingListenerFailureReporter::class,
+    );
+
+    event(new DemoOccurred('reporter-failed'));
+
+    $assertSame(
+        ['best-effort:reporter-failed', 'second:reporter-failed'],
+        $log->entries,
+        '失败上报器异常阻断了同步调用链',
     );
 });
 

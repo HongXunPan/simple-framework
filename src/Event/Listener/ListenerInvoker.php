@@ -10,6 +10,10 @@ use Throwable;
 
 final readonly class ListenerInvoker
 {
+    public function __construct(private ListenerFailureReporter $failureReporter)
+    {
+    }
+
     /**
      * @param class-string $listenerClass
      */
@@ -18,12 +22,37 @@ final readonly class ListenerInvoker
         try {
             $listener = app($listenerClass);
         } catch (Throwable $throwable) {
-            throw new EventConfigException(
+            $this->handleFailure($listenerClass, $event, new EventConfigException(
                 "事件监听器无法通过容器解析：{$listenerClass}",
                 previous: $throwable,
-            );
+            ));
+            return;
         }
 
-        $listener->handle($event);
+        try {
+            $listener->handle($event);
+        } catch (Throwable $throwable) {
+            $this->handleFailure($listenerClass, $event, $throwable);
+        }
+    }
+
+    /** @param class-string $listenerClass */
+    private function handleFailure(
+        string $listenerClass,
+        Event $event,
+        Throwable $throwable,
+    ): void {
+        if (!is_a($listenerClass, ShouldHandleBestEffort::class, true)) {
+            throw $throwable;
+        }
+
+        try {
+            $this->failureReporter->report($listenerClass, $event, $throwable);
+        } catch (Throwable $reporterFailure) {
+            error_log(sprintf(
+                '[simple-framework:event:best-effort] failure reporter error: %s',
+                $reporterFailure::class,
+            ));
+        }
     }
 }

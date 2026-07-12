@@ -9,7 +9,10 @@ use HongXunPan\Framework\Event\Message\EventMessage as ContractEventMessage;
 use HongXunPan\Framework\Event\Event as ContractWorkerEvent;
 use HongXunPan\Framework\Event\Execution\ErrorMessageSanitizer as ContractErrorMessageSanitizer;
 use HongXunPan\Framework\Event\Execution\Failure as ContractFailure;
+use HongXunPan\Framework\Event\Listener\ListenerFailureReporter as ContractListenerFailureReporter;
 use HongXunPan\Framework\Event\Listener\ListenerInvoker as ContractListenerInvoker;
+use HongXunPan\Framework\Event\Listener\ShouldHandleBestEffort as ContractShouldHandleBestEffort;
+use HongXunPan\Framework\Event\Listener\ShouldQueue as ContractShouldQueue;
 use HongXunPan\Framework\Event\Serialization\Serializer as ContractWorkerSerializer;
 use HongXunPan\Framework\Event\Validation\EventValidator as ContractEventValidator;
 use HongXunPan\Framework\Event\Worker\EventMessageExecutor as ContractEventMessageExecutor;
@@ -45,6 +48,34 @@ final readonly class ContractFailingWorkerListener
     public function handle(ContractWorkerOccurred $event): void
     {
         throw new RuntimeException('消费失败');
+    }
+}
+
+final readonly class ContractBestEffortFailingWorkerListener implements
+    ContractShouldQueue,
+    ContractShouldHandleBestEffort
+{
+    public function handle(ContractWorkerOccurred $event): void
+    {
+        throw new RuntimeException('best-effort 消费失败');
+    }
+}
+
+final class RecordingContractListenerFailureReporter implements ContractListenerFailureReporter
+{
+    /** @var list<array{listener_class: string, event_class: string, error_class: string}> */
+    public array $reports = [];
+
+    public function report(
+        string $listenerClass,
+        ContractWorkerEvent $event,
+        Throwable $throwable,
+    ): void {
+        $this->reports[] = [
+            'listener_class' => $listenerClass,
+            'event_class' => $event::class,
+            'error_class' => $throwable::class,
+        ];
     }
 }
 
@@ -118,7 +149,12 @@ final readonly class FixedEventMessageSerializer implements ContractWorkerSerial
 
 /**
  * @param list<ContractReceivedMessage>|null $messages
- * @return array{worker: EventWorker, consumer: FakeEventConsumer, log: ContractWorkerLog}
+ * @return array{
+ *     worker: EventWorker,
+ *     consumer: FakeEventConsumer,
+ *     log: ContractWorkerLog,
+ *     reporter: RecordingContractListenerFailureReporter
+ * }
  */
 function createContractEventWorker(
     ContractWorkerSerializer $serializer,
@@ -133,15 +169,16 @@ function createContractEventWorker(
         $messages ?? [new ContractReceivedMessage('message-1', 'test-payload')],
     );
     $errors = new ContractErrorMessageSanitizer();
+    $reporter = new RecordingContractListenerFailureReporter();
     $worker = new EventWorker(
         $consumer,
         $serializer,
-        new ContractEventMessageExecutor(new ContractListenerInvoker(), $errors),
+        new ContractEventMessageExecutor(new ContractListenerInvoker($reporter), $errors),
         new ContractEventValidator(),
         $errors,
     );
 
-    return compact('worker', 'consumer', 'log');
+    return compact('worker', 'consumer', 'log', 'reporter');
 }
 
 function contractEventMessage(array $listeners): ContractEventMessage
@@ -273,6 +310,27 @@ $runContractWorker('EventWorker 将 listener 失败交给 Consumer', static func
         false,
         empty($failurePayload['listeners'][0]['finished_at']),
         'Failure 缺少 listener 结束时间',
+    );
+});
+
+$runContractWorker('EventWorker 确认 best-effort listener 失败消息并完成上报', static function () use (
+    $contractWorkerAssertSame,
+): void {
+    $eventMessage = contractEventMessage([ContractBestEffortFailingWorkerListener::class]);
+    $context = createContractEventWorker(new FixedEventMessageSerializer($eventMessage));
+
+    $contractWorkerAssertSame(1, $context['worker']->runOnce(), 'best-effort 消息未计入消费数量');
+    $contractWorkerAssertSame(
+        ['message-1'],
+        array_column($context['consumer']->acknowledged, 'id'),
+        'best-effort listener 失败消息未确认',
+    );
+    $contractWorkerAssertSame([], $context['consumer']->failed, 'best-effort listener 错误进入失败流程');
+    $contractWorkerAssertSame(1, count($context['reporter']->reports), 'best-effort 异常未上报');
+    $contractWorkerAssertSame(
+        ContractBestEffortFailingWorkerListener::class,
+        $context['reporter']->reports[0]['listener_class'],
+        'best-effort 异步上报缺少 listener 类名',
     );
 });
 
