@@ -6,6 +6,7 @@ namespace HongXunPan\Framework\Event\Consumer;
 
 use HongXunPan\DB\Redis\Redis as RedisManager;
 use HongXunPan\Framework\Event\Exception\EventConsumeException;
+use HongXunPan\Framework\Event\Execution\Failure;
 use JsonException;
 use Redis;
 use RedisException;
@@ -68,8 +69,8 @@ final class RedisStreamConsumer implements Consumer
 
         try {
             $this->redis()->xDel($this->stream, [$message->id]);
-        } catch (Throwable $throwable) {
-            throw new EventConsumeException("Redis 已 ACK 消息删除失败：{$message->id}", previous: $throwable);
+        } catch (Throwable) {
+            // XACK 已形成消费终态；XDEL 只清理主 Stream 残留，失败不得伪装成可重放的消费失败。
         }
     }
 

@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
-namespace HongXunPan\Framework\Event\Consumer;
+namespace HongXunPan\Framework\Event\Execution;
 
 use DateTimeImmutable;
 use HongXunPan\Framework\Event\Event;
-use HongXunPan\Framework\Event\Worker\ListenerExecutionResult;
 use Throwable;
 
 final readonly class Failure

@@ -8,6 +8,7 @@ use HongXunPan\Framework\Event\Consumer\Consumer;
 use HongXunPan\Framework\Event\Dispatch\Dispatcher;
 use HongXunPan\Framework\Event\Driver\Driver;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
+use HongXunPan\Framework\Event\Execution\ErrorMessageSanitizer;
 use HongXunPan\Framework\Event\Listener\ListenerRegistry;
 use HongXunPan\Framework\Event\Serialization\Serializer;
 use HongXunPan\Framework\Event\Serialization\SymfonySerializer;
@@ -23,6 +24,7 @@ final class EventBootstrapper
         app()->singleton(EventValidator::class);
         app()->singleton(ConfigValidator::class);
         app()->singleton(Serializer::class, SymfonySerializer::class);
+        app()->singleton(ErrorMessageSanitizer::class);
         app()->singleton(ListenerRegistry::class);
         app()->singleton(Dispatcher::class);
 

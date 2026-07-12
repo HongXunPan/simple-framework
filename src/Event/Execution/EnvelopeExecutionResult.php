@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace HongXunPan\Framework\Event\Worker;
+namespace HongXunPan\Framework\Event\Execution;
 
 final readonly class EnvelopeExecutionResult
 {

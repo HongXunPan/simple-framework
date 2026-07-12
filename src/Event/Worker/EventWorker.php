@@ -6,10 +6,12 @@ namespace HongXunPan\Framework\Event\Worker;
 
 use DateTimeImmutable;
 use HongXunPan\Framework\Event\Consumer\Consumer;
-use HongXunPan\Framework\Event\Consumer\Failure;
 use HongXunPan\Framework\Event\Consumer\Message;
 use HongXunPan\Framework\Event\Dispatch\Envelope;
 use HongXunPan\Framework\Event\Exception\EventConsumeException;
+use HongXunPan\Framework\Event\Execution\EnvelopeExecutionResult;
+use HongXunPan\Framework\Event\Execution\ErrorMessageSanitizer;
+use HongXunPan\Framework\Event\Execution\Failure;
 use HongXunPan\Framework\Event\Serialization\Serializer;
 use HongXunPan\Framework\Event\Validation\EventValidator;
 use Throwable;
@@ -21,6 +23,7 @@ final readonly class EventWorker
         private Serializer $serializer,
         private EnvelopeRunner $runner,
         private EventValidator $events,
+        private ErrorMessageSanitizer $errors,
     ) {
     }
 
@@ -83,7 +86,7 @@ final readonly class EventWorker
                 errorClass: $throwable === null ? null : $throwable::class,
                 errorMessage: $throwable === null
                     ? null
-                    : $this->runner->sanitizeErrorMessage($throwable->getMessage()),
+                    : $this->errors->sanitize($throwable->getMessage()),
                 failedAt: new DateTimeImmutable(),
             ),
         );

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace HongXunPan\Framework\Event\Consumer;
 
+use HongXunPan\Framework\Event\Execution\Failure;
+
 interface Consumer
 {
     /** @return iterable<Message> */

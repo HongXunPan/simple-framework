@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 use HongXunPan\Framework\Core\Application as ContractWorkerApplication;
 use HongXunPan\Framework\Event\Consumer\Consumer as ContractConsumer;
-use HongXunPan\Framework\Event\Consumer\Failure as ContractFailure;
 use HongXunPan\Framework\Event\Consumer\Message as ContractMessage;
 use HongXunPan\Framework\Event\Dispatch\Envelope as ContractEnvelope;
 use HongXunPan\Framework\Event\Event as ContractWorkerEvent;
+use HongXunPan\Framework\Event\Execution\ErrorMessageSanitizer as ContractErrorMessageSanitizer;
+use HongXunPan\Framework\Event\Execution\Failure as ContractFailure;
 use HongXunPan\Framework\Event\Listener\ListenerCaller as ContractListenerCaller;
 use HongXunPan\Framework\Event\Serialization\Serializer as ContractWorkerSerializer;
 use HongXunPan\Framework\Event\Validation\EventValidator as ContractEventValidator;
@@ -135,11 +136,13 @@ function createContractEventWorker(
     $consumer = new FakeEventConsumer(
         $messages ?? [new ContractMessage('message-1', 'test-payload')],
     );
+    $errors = new ContractErrorMessageSanitizer();
     $worker = new EventWorker(
         $consumer,
         $serializer,
-        new ContractEnvelopeRunner(new ContractListenerCaller()),
+        new ContractEnvelopeRunner(new ContractListenerCaller(), $errors),
         new ContractEventValidator(),
+        $errors,
     );
 
     return compact('worker', 'consumer', 'log');
@@ -262,12 +265,17 @@ $runContractWorker('EventWorker 将反序列化失败交给 Consumer', static fu
     $contractWorkerAssertSame,
 ): void {
     $context = createContractEventWorker(
-        new FixedEnvelopeSerializer(failure: new RuntimeException('无法解析消息')),
+        new FixedEnvelopeSerializer(failure: new RuntimeException('token=secret mobile=13800138000')),
     );
 
     $contractWorkerAssertSame(1, $context['worker']->runOnce(), '反序列化失败消息未计数');
     $failure = $context['consumer']->failed[0]['failure'];
     $contractWorkerAssertSame(RuntimeException::class, $failure->errorClass, '反序列化异常类型未保留');
+    $contractWorkerAssertSame(
+        'token=[REDACTED] mobile=1**********',
+        $failure->errorMessage,
+        '反序列化异常未复用统一错误摘要清洗',
+    );
     $contractWorkerAssertSame('message-1', $failure->messageId, 'Failure 消息 ID 错误');
 });
 

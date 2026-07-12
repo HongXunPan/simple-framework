@@ -5,6 +5,8 @@ declare(strict_types=1);
 use HongXunPan\DB\Redis\Redis as WorkerRedisManager;
 use HongXunPan\Framework\Core\Application as WorkerApplication;
 use HongXunPan\Framework\Event\Bootstrap\EventBootstrapper as WorkerEventBootstrapper;
+use HongXunPan\Framework\Event\Consumer\Consumer as WorkerConsumer;
+use HongXunPan\Framework\Event\Consumer\RedisStreamConsumer as WorkerRedisStreamConsumer;
 use HongXunPan\Framework\Event\Event as WorkerEvent;
 use HongXunPan\Framework\Event\Exception\EventConsumeException;
 use HongXunPan\Framework\Event\Listener\ShouldQueue as WorkerShouldQueue;
@@ -23,6 +25,30 @@ final class WorkerInvocationLog
 {
     /** @var list<string> */
     public array $entries = [];
+}
+
+final class WorkerRedisFailureDouble extends Redis
+{
+    public bool $failAcknowledgement = false;
+    public bool $failDeletion = false;
+
+    public function xAck(string $key, string $group, array $ids): int|false
+    {
+        if ($this->failAcknowledgement) {
+            throw new RedisException('模拟 XACK 失败');
+        }
+
+        return parent::xAck($key, $group, $ids);
+    }
+
+    public function xDel(string $key, array $ids): Redis|int|false
+    {
+        if ($this->failDeletion) {
+            throw new RedisException('模拟 XDEL 失败');
+        }
+
+        return parent::xDel($key, $ids);
+    }
 }
 
 final readonly class WorkerFirstListener implements WorkerShouldQueue
@@ -145,6 +171,22 @@ function cleanupRedisStreamConsumer(array $context): void
     $context['redis']->del($context['stream'], $context['failed_stream']);
 }
 
+function injectWorkerRedisFailureDouble(bool $failAcknowledgement, bool $failDeletion): void
+{
+    $redis = new WorkerRedisFailureDouble();
+    $redis->connect('gplus-redis', 6379, 1.0, null, 0, 1.0);
+    $redis->failAcknowledgement = $failAcknowledgement;
+    $redis->failDeletion = $failDeletion;
+
+    $consumer = app(WorkerConsumer::class);
+    if (!$consumer instanceof WorkerRedisStreamConsumer) {
+        throw new RuntimeException('当前 Consumer 不是 RedisStreamConsumer');
+    }
+
+    $property = new ReflectionProperty($consumer, 'redis');
+    $property->setValue($consumer, $redis);
+}
+
 $workerFailures = [];
 
 $workerAssertSame = static function (mixed $expected, mixed $actual, string $message): void {
@@ -218,6 +260,47 @@ $runWorker('Redis key 前缀不影响新消息消费', static function () use ($
         $workerAssertSame(1, $context['worker']->runOnce(), '带前缀的 Stream 消息未被消费');
         $workerAssertSame(['first:prefixed'], $context['log']->entries, '带前缀消息未执行 listener');
         $workerAssertSame(0, $context['redis']->xLen($context['stream']), '带前缀消息未从主 Stream 删除');
+    } finally {
+        cleanupRedisStreamConsumer($context);
+    }
+});
+
+$runWorker('XACK 失败时保留 pending 并抛出消费异常', static function () use (
+    $workerAssertSame,
+    $workerAssertThrows,
+): void {
+    $context = bootRedisStreamConsumer([WorkerFirstListener::class]);
+
+    try {
+        event(new WorkerOccurred('ack-failed'));
+        injectWorkerRedisFailureDouble(failAcknowledgement: true, failDeletion: false);
+
+        $workerAssertThrows(
+            EventConsumeException::class,
+            static fn () => $context['worker']->runOnce(),
+            'XACK 失败时 Worker 未抛消费异常',
+        );
+
+        $pending = $context['redis']->xPending($context['stream'], $context['group']);
+        $workerAssertSame(1, $pending[0] ?? null, 'XACK 失败后消息未保留 pending');
+        $workerAssertSame(1, $context['redis']->xLen($context['stream']), 'XACK 失败后主消息被删除');
+    } finally {
+        cleanupRedisStreamConsumer($context);
+    }
+});
+
+$runWorker('XDEL 失败不推翻 ACK 终态并保留可清理残留', static function () use ($workerAssertSame): void {
+    $context = bootRedisStreamConsumer([WorkerFirstListener::class]);
+
+    try {
+        event(new WorkerOccurred('delete-failed'));
+        injectWorkerRedisFailureDouble(failAcknowledgement: false, failDeletion: true);
+
+        $workerAssertSame(1, $context['worker']->runOnce(), 'XDEL 失败不应中断已完成的消费');
+
+        $pending = $context['redis']->xPending($context['stream'], $context['group']);
+        $workerAssertSame(0, $pending[0] ?? null, 'XDEL 失败后已 ACK 消息仍残留 pending');
+        $workerAssertSame(1, $context['redis']->xLen($context['stream']), 'XDEL 失败后未保留可清理残留');
     } finally {
         cleanupRedisStreamConsumer($context);
     }
