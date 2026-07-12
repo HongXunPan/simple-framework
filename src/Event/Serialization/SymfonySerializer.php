@@ -101,7 +101,7 @@ final readonly class SymfonySerializer implements Serializer
         }
 
         $eventClass = $this->nonEmptyString($message, 'event_class');
-        $this->assertSupports($eventClass);
+        $this->events->validate($eventClass);
         $eventVersion = $this->positiveInt($message, 'event_version');
         if ($eventVersion !== $this->events->versionOf($eventClass)) {
             throw new UnexpectedValueException("不支持的 Event 版本：{$eventClass} v{$eventVersion}");
@@ -141,11 +141,6 @@ final readonly class SymfonySerializer implements Serializer
             traceId: $traceId,
             envelopeVersion: $envelopeVersion,
         );
-    }
-
-    public function assertSupports(string $eventClass): void
-    {
-        $this->events->validate($eventClass);
     }
 
     /** @param array<mixed> $message */

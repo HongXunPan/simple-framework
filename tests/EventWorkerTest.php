@@ -114,10 +114,6 @@ final readonly class FixedEnvelopeSerializer implements ContractWorkerSerializer
 
         return $this->envelope ?? throw new LogicException('测试 Envelope 未配置');
     }
-
-    public function assertSupports(string $eventClass): void
-    {
-    }
 }
 
 /**

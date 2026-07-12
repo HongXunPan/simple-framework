@@ -21,13 +21,4 @@ final readonly class EnvelopeExecutionResult
 
         return true;
     }
-
-    /** @return list<array<string, bool|int|string|null>> */
-    public function toArray(): array
-    {
-        return array_map(
-            static fn (ListenerExecutionResult $listener): array => $listener->toArray(),
-            $this->listeners,
-        );
-    }
 }

@@ -41,10 +41,6 @@ final class ThrowingEventSerializer implements Serializer
     {
         throw new LogicException('测试不调用反序列化');
     }
-
-    public function assertSupports(string $eventClass): void
-    {
-    }
 }
 
 final class FixedEventSerializer implements Serializer
@@ -57,10 +53,6 @@ final class FixedEventSerializer implements Serializer
     public function deserialize(string $payload): Envelope
     {
         throw new LogicException('测试不调用反序列化');
-    }
-
-    public function assertSupports(string $eventClass): void
-    {
     }
 }
 

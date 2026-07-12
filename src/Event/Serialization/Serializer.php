@@ -11,7 +11,4 @@ interface Serializer
     public function serialize(Envelope $envelope): string;
 
     public function deserialize(string $payload): Envelope;
-
-    /** @param class-string $eventClass */
-    public function assertSupports(string $eventClass): void;
 }
