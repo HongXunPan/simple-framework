@@ -6,9 +6,9 @@ namespace HongXunPan\Framework\Event\Driver;
 
 use HongXunPan\DB\Redis\Redis as RedisManager;
 use HongXunPan\Framework\Event\Consumer\RedisStreamConsumer;
-use HongXunPan\Framework\Event\Dispatch\EventMessage;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Exception\EventPublishException;
+use HongXunPan\Framework\Event\Message\EventMessage;
 use HongXunPan\Framework\Event\Serialization\Serializer;
 use Throwable;
 
@@ -54,7 +54,7 @@ final readonly class RedisStreamDriver implements Driver
         }
     }
 
-    public static function consumer(): string
+    public static function consumerClass(): string
     {
         return RedisStreamConsumer::class;
     }

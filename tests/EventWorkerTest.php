@@ -5,11 +5,11 @@ declare(strict_types=1);
 use HongXunPan\Framework\Core\Application as ContractWorkerApplication;
 use HongXunPan\Framework\Event\Consumer\Consumer as ContractConsumer;
 use HongXunPan\Framework\Event\Consumer\ReceivedMessage as ContractReceivedMessage;
-use HongXunPan\Framework\Event\Dispatch\EventMessage as ContractEventMessage;
+use HongXunPan\Framework\Event\Message\EventMessage as ContractEventMessage;
 use HongXunPan\Framework\Event\Event as ContractWorkerEvent;
 use HongXunPan\Framework\Event\Execution\ErrorMessageSanitizer as ContractErrorMessageSanitizer;
 use HongXunPan\Framework\Event\Execution\Failure as ContractFailure;
-use HongXunPan\Framework\Event\Listener\ListenerCaller as ContractListenerCaller;
+use HongXunPan\Framework\Event\Listener\ListenerInvoker as ContractListenerInvoker;
 use HongXunPan\Framework\Event\Serialization\Serializer as ContractWorkerSerializer;
 use HongXunPan\Framework\Event\Validation\EventValidator as ContractEventValidator;
 use HongXunPan\Framework\Event\Worker\EventMessageExecutor as ContractEventMessageExecutor;
@@ -136,7 +136,7 @@ function createContractEventWorker(
     $worker = new EventWorker(
         $consumer,
         $serializer,
-        new ContractEventMessageExecutor(new ContractListenerCaller(), $errors),
+        new ContractEventMessageExecutor(new ContractListenerInvoker(), $errors),
         new ContractEventValidator(),
         $errors,
     );
@@ -148,7 +148,7 @@ function contractEventMessage(array $listeners): ContractEventMessage
 {
     return new ContractEventMessage(
         eventId: 'event-contract-1',
-        occurredAt: new DateTimeImmutable(),
+        createdAt: new DateTimeImmutable(),
         event: new ContractWorkerOccurred('contract'),
         listeners: $listeners,
         traceId: 'trace-contract-1',
@@ -259,7 +259,11 @@ $runContractWorker('EventWorker 将 listener 失败交给 Consumer', static func
     $contractWorkerAssertSame(false, $failure->listeners[0]->succeeded, 'Failure 缺少 listener 结果');
     $failurePayload = $failure->toArray();
     $contractWorkerAssertSame('failed', $failurePayload['listeners'][0]['status'], 'listener 终态错误');
-    $contractWorkerAssertSame(false, $failurePayload['queued_at'] === null, 'Failure 缺少入队时间');
+    $contractWorkerAssertSame(
+        false,
+        $failurePayload['message_created_at'] === null,
+        'Failure 缺少消息创建时间',
+    );
     $contractWorkerAssertSame(
         false,
         empty($failurePayload['listeners'][0]['started_at']),

@@ -55,7 +55,7 @@ final class ConfigValidator
     public function resolveConsumerClass(string $driverClass): string
     {
         try {
-            $consumerClass = $driverClass::consumer();
+            $consumerClass = $driverClass::consumerClass();
         } catch (Throwable $throwable) {
             throw new EventConfigException(
                 "Event Driver 无法声明 Consumer：{$driverClass}",
@@ -65,7 +65,7 @@ final class ConfigValidator
 
         if (!class_exists($consumerClass) || !is_a($consumerClass, Consumer::class, true)) {
             throw new EventConfigException(
-                "Event Driver 的 consumer() 必须返回 Consumer 类：{$driverClass}",
+                "Event Driver 的 consumerClass() 必须返回 Consumer 类：{$driverClass}",
             );
         }
 

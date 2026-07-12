@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use HongXunPan\Framework\Event\Dispatch\EventMessage;
+use HongXunPan\Framework\Event\Message\EventMessage;
 use HongXunPan\Framework\Event\Listener\ShouldQueue;
 use HongXunPan\Framework\Event\Serialization\SymfonySerializer;
 use HongXunPan\Framework\Event\Validation\EventValidator;
@@ -21,7 +21,7 @@ function strictSerializationMessage(): array
     $serializer = new SymfonySerializer(new EventValidator(), new ListenerValidator());
     $json = $serializer->serialize(new EventMessage(
         eventId: 'event-strict-protocol',
-        occurredAt: new DateTimeImmutable('2026-07-11T12:35:00+08:00'),
+        createdAt: new DateTimeImmutable('2026-07-11T12:35:00+08:00'),
         event: new SerializableOccurred(
             7,
             '严格协议测试',
@@ -72,6 +72,18 @@ $runProtocol('反序列化拒绝 EventMessage 顶层字段漂移', static functi
     $protocolAssertThrows(
         static fn () => $serializer->deserialize(json_encode($message, JSON_THROW_ON_ERROR)),
         'EventMessage 缺失字段未被拒绝',
+    );
+});
+
+$runProtocol('反序列化拒绝旧版 EventMessage 结构', static function () use ($protocolAssertThrows): void {
+    [$serializer, $message] = strictSerializationMessage();
+    $message['message_version'] = 1;
+    $message['occurred_at'] = $message['created_at'];
+    unset($message['created_at']);
+
+    $protocolAssertThrows(
+        static fn () => $serializer->deserialize(json_encode($message, JSON_THROW_ON_ERROR)),
+        '版本 1 的 occurred_at 旧结构未被拒绝',
     );
 });
 

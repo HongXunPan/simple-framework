@@ -9,15 +9,16 @@ use HongXunPan\Framework\Core\Request;
 use HongXunPan\Framework\Event\Driver\Driver;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
-use HongXunPan\Framework\Event\Listener\ListenerCaller;
+use HongXunPan\Framework\Event\Listener\ListenerInvoker;
 use HongXunPan\Framework\Event\Listener\ListenerRegistry;
 use HongXunPan\Framework\Event\Listener\ShouldQueue;
+use HongXunPan\Framework\Event\Message\EventMessage;
 
 final readonly class Dispatcher
 {
     public function __construct(
         private ListenerRegistry $listeners,
-        private ListenerCaller $caller,
+        private ListenerInvoker $invoker,
         private Request $request,
     ) {
     }
@@ -48,7 +49,7 @@ final readonly class Dispatcher
                 continue;
             }
 
-            $this->caller->call($listenerClass, $event);
+            $this->invoker->invoke($listenerClass, $event);
         }
 
         if ($queuedListeners === []) {
@@ -57,7 +58,7 @@ final readonly class Dispatcher
 
         app(Driver::class)->publish(new EventMessage(
             eventId: bin2hex(random_bytes(16)),
-            occurredAt: new DateTimeImmutable(),
+            createdAt: new DateTimeImmutable(),
             event: $event,
             listeners: $queuedListeners,
             traceId: $this->request->requestId,

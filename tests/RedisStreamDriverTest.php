@@ -5,7 +5,7 @@ declare(strict_types=1);
 use HongXunPan\DB\Redis\Redis as RedisManager;
 use HongXunPan\Framework\Core\Application;
 use HongXunPan\Framework\Event\Bootstrap\EventBootstrapper;
-use HongXunPan\Framework\Event\Dispatch\EventMessage;
+use HongXunPan\Framework\Event\Message\EventMessage;
 use HongXunPan\Framework\Event\Driver\RedisStreamDriver;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
@@ -47,7 +47,7 @@ final class FixedEventSerializer implements Serializer
 {
     public function serialize(EventMessage $message): string
     {
-        return '{"message_version":1}';
+        return '{"message_version":2}';
     }
 
     public function deserialize(string $payload): EventMessage
@@ -211,7 +211,7 @@ $runRedis('Redis Driver 包装序列化异常', static function () use ($redisAs
         EventPublishException::class,
         static fn () => $driver->publish(new EventMessage(
             eventId: 'event-serialize-failed',
-            occurredAt: new DateTimeImmutable(),
+            createdAt: new DateTimeImmutable(),
             event: new RedisPublishedOccurred('序列化失败'),
             listeners: [RedisPublishedListener::class],
         )),
@@ -237,7 +237,7 @@ $runRedis('Redis Driver 包装连接异常', static function () use ($redisAsser
         EventPublishException::class,
         static fn () => $driver->publish(new EventMessage(
             eventId: 'event-redis-failed',
-            occurredAt: new DateTimeImmutable(),
+            createdAt: new DateTimeImmutable(),
             event: new RedisPublishedOccurred('Redis 失败'),
             listeners: [RedisPublishedListener::class],
         )),
@@ -267,7 +267,7 @@ $runRedis('一次 dispatch 只写入一条 Redis Stream 消息', static function
         $redisAssertSame(['message'], array_keys($entry), 'stream entry 未保持单 message 字段');
 
         $message = json_decode($entry['message'], true, flags: JSON_THROW_ON_ERROR);
-        $redisAssertSame(1, $message['message_version'], 'Redis 消息 EventMessage 版本错误');
+        $redisAssertSame(2, $message['message_version'], 'Redis 消息 EventMessage 版本错误');
         $redisAssertSame(RedisPublishedOccurred::class, $message['event_class'], 'Redis 消息 Event class 错误');
         $redisAssertSame(
             [RedisPublishedListener::class],

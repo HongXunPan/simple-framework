@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace HongXunPan\Framework\Event\Worker;
 
 use DateTimeImmutable;
-use HongXunPan\Framework\Event\Dispatch\EventMessage;
 use HongXunPan\Framework\Event\Execution\ErrorMessageSanitizer;
 use HongXunPan\Framework\Event\Execution\EventResult;
 use HongXunPan\Framework\Event\Execution\ListenerResult;
-use HongXunPan\Framework\Event\Listener\ListenerCaller;
+use HongXunPan\Framework\Event\Listener\ListenerInvoker;
+use HongXunPan\Framework\Event\Message\EventMessage;
 use Throwable;
 
 final readonly class EventMessageExecutor
 {
     public function __construct(
-        private ListenerCaller $caller,
+        private ListenerInvoker $invoker,
         private ErrorMessageSanitizer $errors,
     ) {
     }
@@ -28,7 +28,7 @@ final readonly class EventMessageExecutor
             $startedAtTick = hrtime(true);
 
             try {
-                $this->caller->call($listenerClass, $message->event);
+                $this->invoker->invoke($listenerClass, $message->event);
                 $results[] = new ListenerResult(
                     listenerClass: $listenerClass,
                     order: $index + 1,

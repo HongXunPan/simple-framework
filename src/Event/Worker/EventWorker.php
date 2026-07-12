@@ -7,11 +7,11 @@ namespace HongXunPan\Framework\Event\Worker;
 use DateTimeImmutable;
 use HongXunPan\Framework\Event\Consumer\Consumer;
 use HongXunPan\Framework\Event\Consumer\ReceivedMessage;
-use HongXunPan\Framework\Event\Dispatch\EventMessage;
 use HongXunPan\Framework\Event\Exception\EventConsumeException;
 use HongXunPan\Framework\Event\Execution\ErrorMessageSanitizer;
 use HongXunPan\Framework\Event\Execution\EventResult;
 use HongXunPan\Framework\Event\Execution\Failure;
+use HongXunPan\Framework\Event\Message\EventMessage;
 use HongXunPan\Framework\Event\Serialization\Serializer;
 use HongXunPan\Framework\Event\Validation\EventValidator;
 use Throwable;
@@ -85,7 +85,7 @@ final readonly class EventWorker
                     ? null
                     : $this->events->versionOf($eventMessage->event::class),
                 traceId: $eventMessage?->traceId,
-                queuedAt: $eventMessage?->occurredAt,
+                messageCreatedAt: $eventMessage?->createdAt,
                 listeners: $result?->listeners ?? [],
                 errorClass: $throwable === null ? null : $throwable::class,
                 errorMessage: $throwable === null

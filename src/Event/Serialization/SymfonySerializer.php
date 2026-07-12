@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace HongXunPan\Framework\Event\Serialization;
 
 use DateTimeImmutable;
-use HongXunPan\Framework\Event\Dispatch\EventMessage;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Listener\ShouldQueue;
+use HongXunPan\Framework\Event\Message\EventMessage;
 use HongXunPan\Framework\Event\Validation\EventValidator;
 use HongXunPan\Framework\Event\Validation\ListenerValidator;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
@@ -28,7 +28,7 @@ final readonly class SymfonySerializer implements Serializer
     private const array MESSAGE_FIELDS = [
         'message_version',
         'event_id',
-        'occurred_at',
+        'created_at',
         'trace_id',
         'event_class',
         'event_version',
@@ -76,7 +76,7 @@ final readonly class SymfonySerializer implements Serializer
         return $this->serializer->encode([
             'message_version' => $message->messageVersion,
             'event_id' => $message->eventId,
-            'occurred_at' => $message->occurredAt->format(self::DATE_FORMAT),
+            'created_at' => $message->createdAt->format(self::DATE_FORMAT),
             'trace_id' => $message->traceId,
             'event_class' => $eventClass,
             'event_version' => $this->events->versionOf($eventClass),
@@ -135,7 +135,7 @@ final readonly class SymfonySerializer implements Serializer
 
         return new EventMessage(
             eventId: $this->nonEmptyString($data, 'event_id'),
-            occurredAt: $this->dateTime($data, 'occurred_at'),
+            createdAt: $this->dateTime($data, 'created_at'),
             event: $event,
             listeners: $listeners,
             traceId: $traceId,

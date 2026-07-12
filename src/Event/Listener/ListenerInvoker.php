@@ -8,12 +8,12 @@ use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
 use Throwable;
 
-final readonly class ListenerCaller
+final readonly class ListenerInvoker
 {
     /**
      * @param class-string $listenerClass
      */
-    public function call(string $listenerClass, Event $event): void
+    public function invoke(string $listenerClass, Event $event): void
     {
         try {
             $listener = app($listenerClass);

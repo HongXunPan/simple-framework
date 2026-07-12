@@ -11,7 +11,7 @@ use HongXunPan\Framework\Event\Consumer\Consumer;
 use HongXunPan\Framework\Event\Consumer\ReceivedMessage;
 use HongXunPan\Framework\Event\Execution\Failure;
 use HongXunPan\Framework\Event\Dispatch\Dispatcher;
-use HongXunPan\Framework\Event\Dispatch\EventMessage;
+use HongXunPan\Framework\Event\Message\EventMessage;
 use HongXunPan\Framework\Event\Driver\Driver;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
@@ -106,7 +106,7 @@ final class FakeDriver implements Driver
     {
     }
 
-    public static function consumer(): string
+    public static function consumerClass(): string
     {
         return SyncFakeConsumer::class;
     }
@@ -139,7 +139,7 @@ final class InvalidConsumerDriver implements Driver
     {
     }
 
-    public static function consumer(): string
+    public static function consumerClass(): string
     {
         return InvalidDriver::class;
     }
@@ -156,7 +156,7 @@ final class RejectingConfigDriver implements Driver
         throw new EventConfigException('Fake Driver 配置无效');
     }
 
-    public static function consumer(): string
+    public static function consumerClass(): string
     {
         return SyncFakeConsumer::class;
     }
