@@ -3,9 +3,11 @@
 use HongXunPan\Framework\Core\Application;
 use HongXunPan\Framework\Event\Dispatch\Dispatcher;
 use HongXunPan\Framework\Event\Event;
+use HongXunPan\Framework\Exceptions\ExceptionReporter;
 use HongXunPan\Tools\Config\Config;
 use HongXunPan\Tools\Env\Env;
 use Illuminate\Contracts\Container\BindingResolutionException;
+use Throwable;
 
 if (!function_exists('app')) {
     /**
@@ -55,5 +57,47 @@ if (!function_exists('event')) {
     function event(Event $event): void
     {
         app(Dispatcher::class)->dispatch($event);
+    }
+}
+
+if (!function_exists('report')) {
+    function report(Throwable $throwable): void
+    {
+        try {
+            app(ExceptionReporter::class)->report($throwable);
+        } catch (Throwable $reporterFailure) {
+            error_log(sprintf(
+                '[simple-framework:report] reporter failure: %s; original: %s',
+                $reporterFailure::class,
+                $throwable::class,
+            ));
+        }
+    }
+}
+
+if (!function_exists('rescue')) {
+    /**
+     * @template TValue
+     * @template TFallback
+     * @param callable(): TValue $callback
+     * @param TFallback|callable(Throwable): TFallback $fallback
+     * @param bool|callable(Throwable): bool $report
+     * @return TValue|TFallback
+     */
+    function rescue(
+        callable $callback,
+        mixed $fallback = null,
+        bool|callable $report = true,
+    ): mixed {
+        try {
+            return $callback();
+        } catch (Throwable $throwable) {
+            $shouldReport = is_callable($report) ? $report($throwable) : $report;
+            if ($shouldReport) {
+                report($throwable);
+            }
+
+            return is_callable($fallback) ? $fallback($throwable) : $fallback;
+        }
     }
 }

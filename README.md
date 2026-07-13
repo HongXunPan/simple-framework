@@ -8,6 +8,32 @@
 composer require hongxunpan/simple-framework
 ```
 
+## 全局异常上报与 rescue
+
+框架提供只上报、不生成响应的 `report()`，以及用于显式容错的通用 `rescue()`：
+
+```php
+$result = rescue(
+    static fn () => $service->runOptionalOperation(),
+    fallback: false,
+);
+```
+
+callback 成功时返回原结果；失败时默认通过 `ExceptionReporter` 上报原异常，再返回固定 fallback 或执行 fallback callable。也可以使用 `report: false` 或判断 callable 控制是否上报。
+
+业务仓可以在 `config/singleton.php` 覆盖默认上报器：
+
+```php
+use App\Exceptions\BusinessExceptionReporter;
+use HongXunPan\Framework\Exceptions\ExceptionReporter;
+
+return [
+    ExceptionReporter::class => BusinessExceptionReporter::class,
+];
+```
+
+`rescue()` 会捕获 `Throwable`，只应包裹业务已经明确允许失败的旁路操作。关键写入、配置校验和默认 Event 发布仍应让异常向上传播。
+
 ## 业务事件 MVP
 
 当前 Event 内核支持：

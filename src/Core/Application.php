@@ -3,7 +3,9 @@
 namespace HongXunPan\Framework\Core;
 
 use Closure;
+use HongXunPan\Framework\Exceptions\ErrorLogExceptionReporter;
 use HongXunPan\Framework\Exceptions\ErrorHandler;
+use HongXunPan\Framework\Exceptions\ExceptionReporter;
 use HongXunPan\Framework\Response\ResponseContract;
 use HongXunPan\Framework\Route\Route;
 use Illuminate\Container\Container;
@@ -49,6 +51,9 @@ class Application extends Container
         } else {
             error_reporting(E_ERROR);
             ini_set('display_errors', 'Off');
+        }
+        if (!$this->bound(ExceptionReporter::class)) {
+            $this->singleton(ExceptionReporter::class, ErrorLogExceptionReporter::class);
         }
         $this->loadConfig($this);
         $this->initialized = true;
