@@ -5,6 +5,10 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 use HongXunPan\Framework\Core\Application;
+use HongXunPan\Framework\Event\Exception\EventConfigException;
+use HongXunPan\Framework\Event\Exception\EventConsumeException;
+use HongXunPan\Framework\Event\Exception\EventException;
+use HongXunPan\Framework\Event\Exception\EventPublishException;
 use HongXunPan\Framework\Exceptions\ErrorLogExceptionReporter;
 use HongXunPan\Framework\Exceptions\ExceptionReporter;
 use HongXunPan\Tools\Config\Config;
@@ -68,6 +72,20 @@ $runHelper('Application 默认绑定异常上报器', static function (): void {
     bootHelperApplication();
     if (!app(ExceptionReporter::class) instanceof ErrorLogExceptionReporter) {
         throw new RuntimeException('Application 未绑定默认异常上报器');
+    }
+});
+
+$runHelper('Event 异常共享可识别基类', static function (): void {
+    $exceptions = [
+        new EventConfigException('配置异常'),
+        new EventPublishException('发布异常'),
+        new EventConsumeException('消费异常'),
+    ];
+
+    foreach ($exceptions as $exception) {
+        if (!$exception instanceof EventException) {
+            throw new RuntimeException($exception::class . ' 未继承 EventException');
+        }
     }
 });
 

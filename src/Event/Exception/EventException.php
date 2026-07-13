@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace HongXunPan\Framework\Event\Exception;
 
-final class EventPublishException extends EventException
+use RuntimeException;
+
+abstract class EventException extends RuntimeException
 {
 }

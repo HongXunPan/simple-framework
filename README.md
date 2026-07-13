@@ -34,6 +34,8 @@ return [
 
 `rescue()` 会捕获 `Throwable`，只应包裹业务已经明确允许失败的旁路操作。关键写入、配置校验和默认 Event 发布仍应让异常向上传播。
 
+Event 配置、发布与消费异常统一继承 `HongXunPan\Framework\Event\Exception\EventException`，业务仓可以基于该公共异常族设置独立日志 Channel 或告警策略，不需要逐个枚举具体异常类。
+
 ## 业务事件 MVP
 
 当前 Event 内核支持：
