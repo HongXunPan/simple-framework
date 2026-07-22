@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use HongXunPan\DB\Redis\Redis as RedisManager;
 use HongXunPan\Framework\Core\Application;
+use HongXunPan\Framework\Config\Config;
+use HongXunPan\Framework\Config\Env;
 use HongXunPan\Framework\Event\Bootstrap\EventBootstrapper;
 use HongXunPan\Framework\Event\Message\EventMessage;
 use HongXunPan\Framework\Event\Driver\RedisStreamDriver;
@@ -13,8 +15,6 @@ use HongXunPan\Framework\Event\Exception\EventPublishException;
 use HongXunPan\Framework\Event\Listener\ShouldQueue;
 use HongXunPan\Framework\Event\Serialization\Serializer;
 use HongXunPan\Framework\Event\Validation\ConfigValidator;
-use HongXunPan\Tools\Config\Config;
-use HongXunPan\Tools\Env\Env;
 
 final readonly class RedisPublishedOccurred implements Event
 {
@@ -73,21 +73,30 @@ function redisDriverConfig(string $connection, string $stream): array
 }
 
 /**
+ * @param array<string, mixed> $config
+ */
+function bindRedisDriverConfig(array $config): Application
+{
+    $application = new Application();
+    Application::setInstance($application);
+    $application->instance(Env::class, Env::fromArray(['DEBUG' => false]));
+    $application->instance(Config::class, Config::fromArray($config));
+
+    return $application;
+}
+
+/**
  * @param array<string, mixed> $driverConfig
  */
 function bootRedisEventApplication(array $driverConfig, string $connectionName): Application
 {
-    putenv('DEBUG=false');
-    $loaded = (new ReflectionClass(Env::class))->getProperty('loaded');
-    $loaded->setValue(null, true);
-
     $redisConfig = [
         'host' => 'gplus-redis',
         'port' => 6379,
         'timeout' => 1.0,
         'readTimeout' => 1.0,
     ];
-    Config::$config = [
+    $config = [
         'app' => ['timezone' => 'Asia/Shanghai'],
         'singleton' => [],
         'boot' => [[EventBootstrapper::class, 'boot']],
@@ -101,8 +110,7 @@ function bootRedisEventApplication(array $driverConfig, string $connectionName):
     ];
 
     RedisManager::setConfig($redisConfig, $connectionName);
-    $application = new Application();
-    Application::setInstance($application);
+    $application = bindRedisDriverConfig($config);
     $application->init('/tmp/simple-framework-event-tests');
 
     return $application;
@@ -152,11 +160,11 @@ $runRedis('Redis Driver 配置缺项时启动校验失败', static function () u
     $connection = 'event-config-test';
     $stream = 'simple-framework:event-config-test';
     $validConfig = redisDriverConfig($connection, $stream);
-    Config::$config = [
+    bindRedisDriverConfig([
         'database' => [
             'redis' => [$connection => ['host' => 'gplus-redis', 'port' => 6379]],
         ],
-    ];
+    ]);
     $listeners = [RedisPublishedOccurred::class => [RedisPublishedListener::class]];
 
     foreach ([
@@ -184,7 +192,7 @@ $runRedis('Redis Driver 配置缺项时启动校验失败', static function () u
 });
 
 $runRedis('Redis Driver 连接名必须存在于 database.redis', static function () use ($redisAssertThrows): void {
-    Config::$config = ['database' => ['redis' => []]];
+    bindRedisDriverConfig(['database' => ['redis' => []]]);
 
     $redisAssertThrows(
         EventConfigException::class,
@@ -197,14 +205,14 @@ $runRedis('Redis Driver 连接名必须存在于 database.redis', static functio
 });
 
 $runRedis('Redis Driver 包装序列化异常', static function () use ($redisAssertSame, $redisAssertThrows): void {
-    Config::$config = [
+    bindRedisDriverConfig([
         'events' => [
             'driver' => [
                 'connection' => 'unused',
                 'stream' => 'simple-framework:unused',
             ],
         ],
-    ];
+    ]);
     $driver = new RedisStreamDriver(new ThrowingEventSerializer());
 
     $throwable = $redisAssertThrows(
@@ -223,14 +231,14 @@ $runRedis('Redis Driver 包装序列化异常', static function () use ($redisAs
 
 $runRedis('Redis Driver 包装连接异常', static function () use ($redisAssertThrows): void {
     $connection = 'missing-runtime-' . bin2hex(random_bytes(6));
-    Config::$config = [
+    bindRedisDriverConfig([
         'events' => [
             'driver' => [
                 'connection' => $connection,
                 'stream' => 'simple-framework:missing-runtime',
             ],
         ],
-    ];
+    ]);
     $driver = new RedisStreamDriver(new FixedEventSerializer());
 
     $throwable = $redisAssertThrows(

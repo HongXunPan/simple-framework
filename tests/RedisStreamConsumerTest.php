@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use HongXunPan\DB\Redis\Redis as WorkerRedisManager;
+use HongXunPan\Framework\Config\Config as WorkerConfig;
+use HongXunPan\Framework\Config\Env as WorkerEnv;
 use HongXunPan\Framework\Core\Application as WorkerApplication;
 use HongXunPan\Framework\Event\Bootstrap\EventBootstrapper as WorkerEventBootstrapper;
 use HongXunPan\Framework\Event\Consumer\Consumer as WorkerConsumer;
@@ -11,8 +13,6 @@ use HongXunPan\Framework\Event\Event as WorkerEvent;
 use HongXunPan\Framework\Event\Exception\EventConsumeException;
 use HongXunPan\Framework\Event\Listener\ShouldQueue as WorkerShouldQueue;
 use HongXunPan\Framework\Event\Worker\EventWorker;
-use HongXunPan\Tools\Config\Config as WorkerConfig;
-use HongXunPan\Tools\Env\Env as WorkerEnv;
 
 final readonly class WorkerOccurred implements WorkerEvent
 {
@@ -107,10 +107,6 @@ function bootRedisStreamConsumer(
     array $redisOptions = [],
 ): array
 {
-    putenv('DEBUG=false');
-    $loaded = (new ReflectionClass(WorkerEnv::class))->getProperty('loaded');
-    $loaded->setValue(null, true);
-
     $suffix = bin2hex(random_bytes(6));
     $connection = 'event-worker-' . $suffix;
     $stream = 'simple-framework:event-worker:' . $suffix;
@@ -134,7 +130,7 @@ function bootRedisStreamConsumer(
         'failed_max_length' => 1000,
     ], $driverOverrides);
 
-    WorkerConfig::$config = [
+    $config = [
         'app' => ['timezone' => 'Asia/Shanghai'],
         'singleton' => [],
         'boot' => [[WorkerEventBootstrapper::class, 'boot']],
@@ -148,6 +144,8 @@ function bootRedisStreamConsumer(
 
     $application = new WorkerApplication();
     WorkerApplication::setInstance($application);
+    $application->instance(WorkerEnv::class, WorkerEnv::fromArray(['DEBUG' => false]));
+    $application->instance(WorkerConfig::class, WorkerConfig::fromArray($config));
     $application->init('/tmp/simple-framework-event-tests');
 
     $log = new WorkerInvocationLog();

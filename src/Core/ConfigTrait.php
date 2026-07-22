@@ -3,20 +3,24 @@
 namespace HongXunPan\Framework\Core;
 
 use Exception;
+use HongXunPan\Framework\Config\Config;
 use HongXunPan\Framework\Response\Response;
 use HongXunPan\Framework\Response\ResponseContract;
-use HongXunPan\Tools\Config\Config;
 
 trait ConfigTrait
 {
-    private function loadConfig(Application $app): static
+    private function loadConfig(Application $app, bool $cacheEnabled): static
     {
-        Config::getInstance()->setConfigPath(
-            $app->getPath('base', 'config'),
-            $app->getPath('base', 'bootstrap/cache'),
-            !$app->isDebug
-        );
-        ini_set('date.timezone', config('app.timezone'));
+        if (!$app->bound(Config::class)) {
+            $app->instance(Config::class, new Config(
+                configPath: $app->getPath('base', 'config'),
+                cachePath: $app->getPath('base', 'bootstrap/cache'),
+                cacheEnabled: $cacheEnabled,
+            ));
+        }
+        app(Config::class)->load();
+        date_default_timezone_set((string) config('app.timezone', 'UTC'));
+
         return $this
             ->loadSingleton()
             ->loadBoot();

@@ -1,13 +1,14 @@
 <?php
 
 use HongXunPan\Framework\Core\Application;
+use HongXunPan\Framework\Config\Config;
+use HongXunPan\Framework\Config\Env;
 use HongXunPan\Framework\Event\Dispatch\Dispatcher;
 use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Exceptions\ExceptionReporter;
-use HongXunPan\Tools\Config\Config;
-use HongXunPan\Tools\Env\Env;
+use HongXunPan\Tools\Config\Config as LegacyConfig;
+use HongXunPan\Tools\Env\Env as LegacyEnv;
 use Illuminate\Contracts\Container\BindingResolutionException;
-use Throwable;
 
 if (!function_exists('app')) {
     /**
@@ -35,9 +36,14 @@ if (!function_exists('env')) {
      * @author HongXunPan <me@kangxuanpeng.com>
      * @date 2023-07-24 14:50
      */
-    function env($key, $default = null): bool|array|string|null
+    function env(string $key, mixed $default = null): mixed
     {
-        return Env::get($key, $default);
+        $application = Application::getInstance();
+        if ($application->bound(Env::class)) {
+            return $application->make(Env::class)->get($key, $default);
+        }
+
+        return LegacyEnv::get($key, $default);
     }
 }
 
@@ -47,9 +53,14 @@ if (!function_exists('config')) {
      * @param bool|array|string $default
      * @return array|bool|mixed|string|null
      */
-    function config(string $key, bool|array|string $default = ''): mixed
+    function config(string $key = '', mixed $default = ''): mixed
     {
-        return Config::getInstance()->getConfig($key, $default);
+        $application = Application::getInstance();
+        if ($application->bound(Config::class)) {
+            return $application->make(Config::class)->get($key, $default);
+        }
+
+        return LegacyConfig::getInstance()->getConfig($key, $default);
     }
 }
 
@@ -61,11 +72,11 @@ if (!function_exists('event')) {
 }
 
 if (!function_exists('report')) {
-    function report(Throwable $throwable): void
+    function report(\Throwable $throwable): void
     {
         try {
             app(ExceptionReporter::class)->report($throwable);
-        } catch (Throwable $reporterFailure) {
+        } catch (\Throwable $reporterFailure) {
             error_log(sprintf(
                 '[simple-framework:report] reporter failure: %s; original: %s',
                 $reporterFailure::class,
@@ -80,8 +91,8 @@ if (!function_exists('rescue')) {
      * @template TValue
      * @template TFallback
      * @param callable(): TValue $callback
-     * @param TFallback|callable(Throwable): TFallback $fallback
-     * @param bool|callable(Throwable): bool $report
+     * @param TFallback|callable(\Throwable): TFallback $fallback
+     * @param bool|callable(\Throwable): bool $report
      * @return TValue|TFallback
      */
     function rescue(
@@ -91,7 +102,7 @@ if (!function_exists('rescue')) {
     ): mixed {
         try {
             return $callback();
-        } catch (Throwable $throwable) {
+        } catch (\Throwable $throwable) {
             $shouldReport = is_callable($report) ? $report($throwable) : $report;
             if ($shouldReport) {
                 report($throwable);

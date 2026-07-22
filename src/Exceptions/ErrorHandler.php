@@ -8,6 +8,17 @@ class ErrorHandler
 {
     public static function handle(Throwable $throwable): void
     {
-        dd($throwable);
+        report($throwable);
+
+        try {
+            app(ExceptionRenderer::class)->render($throwable);
+        } catch (Throwable $rendererFailure) {
+            error_log(sprintf(
+                '[simple-framework:render] renderer failure: %s; original: %s',
+                $rendererFailure::class,
+                $throwable::class,
+            ));
+            (new SafeExceptionRenderer())->render($throwable);
+        }
     }
 }

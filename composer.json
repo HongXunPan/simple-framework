@@ -1,7 +1,7 @@
 {
     "name": "hongxunpan/simple-framework",
     "description": "core framework for simple-php by HongXunPan",
-    "type": "libary",
+    "type": "library",
     "license": "MIT",
     "autoload": {
         "psr-4": {

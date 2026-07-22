@@ -8,6 +8,24 @@
 composer require hongxunpan/simple-framework
 ```
 
+## Config 与 Env
+
+框架核心提供容器单例 `Config`、`Env` 以及全局 `config()`、`env()`：
+
+- 进程环境变量优先于项目 `.env`；
+- `.env` 不存在时使用调用方默认值，不阻断应用启动；
+- 配置支持点号路径读取；
+- 非调试环境可以生成原子配置缓存；
+- `APP_ENV`、`APP_DEBUG` 是推荐环境键，兼容期继续读取 `ENV_NAME`、`DEBUG`。
+
+正常应用启动始终使用 framework Config / Env。当前版本仅在核心实例尚未绑定时回退到 `php-tools` 旧入口，用于已有脚本迁移；新代码不得继续依赖该回退路径。
+
+## 默认异常处理
+
+默认 `ErrorHandler` 先调用 `ExceptionReporter`，再调用 `ExceptionRenderer`。完整异常只进入 Reporter，默认 `SafeExceptionRenderer` 对 HTTP 请求返回状态码 500 和 `Internal Server Error`，不输出异常消息、绝对路径或堆栈。
+
+业务项目可以在 `config/singleton.php` 分别覆盖 Reporter 和 Renderer。现有 `Application::run($closure, ErrorHandler::class)` 静态处理器入口在兼容期继续有效。
+
 ## 全局异常上报与 rescue
 
 框架提供只上报、不生成响应的 `report()`，以及用于显式容错的通用 `rescue()`：

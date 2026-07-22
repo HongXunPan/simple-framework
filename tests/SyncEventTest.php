@@ -6,6 +6,8 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 use HongXunPan\Framework\Core\Application;
 use HongXunPan\Framework\Core\Request;
+use HongXunPan\Framework\Config\Config;
+use HongXunPan\Framework\Config\Env;
 use HongXunPan\Framework\Event\Bootstrap\EventBootstrapper;
 use HongXunPan\Framework\Event\Consumer\Consumer;
 use HongXunPan\Framework\Event\Consumer\ReceivedMessage;
@@ -18,8 +20,6 @@ use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Listener\ListenerFailureReporter;
 use HongXunPan\Framework\Event\Listener\ShouldHandleBestEffort;
 use HongXunPan\Framework\Event\Listener\ShouldQueue;
-use HongXunPan\Tools\Config\Config;
-use HongXunPan\Tools\Env\Env;
 
 final readonly class DemoOccurred implements Event
 {
@@ -237,11 +237,7 @@ function bootApplication(
     string $failureReporterClass = RecordingListenerFailureReporter::class,
 ): array
 {
-    putenv('DEBUG=false');
-    $loaded = (new ReflectionClass(Env::class))->getProperty('loaded');
-    $loaded->setValue(null, true);
-
-    Config::$config = [
+    $config = [
         'app' => ['timezone' => 'Asia/Shanghai'],
         'singleton' => [
             Request::class,
@@ -252,14 +248,16 @@ function bootApplication(
         ],
     ];
     if ($withEventsConfig) {
-        Config::$config['events'] = ['listeners' => $listeners];
+        $config['events'] = ['listeners' => $listeners];
         if ($driverClass !== null) {
-            Config::$config['events']['driver'] = ['class' => $driverClass];
+            $config['events']['driver'] = ['class' => $driverClass];
         }
     }
 
     $application = new Application();
     Application::setInstance($application);
+    $application->instance(Env::class, Env::fromArray(['DEBUG' => false]));
+    $application->instance(Config::class, Config::fromArray($config));
     $application->init('/tmp/simple-framework-event-tests');
 
     $log = new InvocationLog();

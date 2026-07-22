@@ -3,9 +3,12 @@
 namespace HongXunPan\Framework\Core;
 
 use Closure;
+use HongXunPan\Framework\Config\Env;
 use HongXunPan\Framework\Exceptions\ErrorLogExceptionReporter;
 use HongXunPan\Framework\Exceptions\ErrorHandler;
+use HongXunPan\Framework\Exceptions\ExceptionRenderer;
 use HongXunPan\Framework\Exceptions\ExceptionReporter;
+use HongXunPan\Framework\Exceptions\SafeExceptionRenderer;
 use HongXunPan\Framework\Response\ResponseContract;
 use HongXunPan\Framework\Route\Route;
 use Illuminate\Container\Container;
@@ -17,6 +20,7 @@ class Application extends Container
 
     public bool $isDebug;
     public bool $isCli;
+    public string $environment;
     private bool $initialized = false;
     /** @var ResponseContract $response*/
     private mixed $response;
@@ -42,22 +46,37 @@ class Application extends Container
         if (!$basePath) {
             $basePath = dirname(__DIR__, 5);
         }
+        self::setInstance($this);
         $this->setPath('base', $basePath);
-        $this->isDebug = (bool)env('debug', false);
-        $this->isCli = str_contains(php_sapi_name(), 'cli');
-        if ($this->isDebug) {
-            ini_set('display_errors', 'On');
-            error_reporting(E_ALL);
-        } else {
-            error_reporting(E_ERROR);
-            ini_set('display_errors', 'Off');
+        $this->isCli = in_array(PHP_SAPI, ['cli', 'phpdbg'], true);
+        error_reporting(E_ALL);
+        ini_set('display_errors', 'Off');
+        $this->bindExceptionHandling();
+        if (!$this->bound(Env::class)) {
+            $this->instance(Env::class, new Env($this->getPath('base') . '.env'));
         }
+        $env = $this->make(Env::class);
+        $this->environment = (string) $env->get('APP_ENV', $env->get('ENV_NAME', 'production'));
+        $this->isDebug = (bool) $env->get('APP_DEBUG', $env->get('DEBUG', false));
+        $this->loadConfig($this, !$this->isDebug);
+        $this->environment = (string) config('app.env', $this->environment);
+        $this->isDebug = (bool) config('app.debug', config('app.is_debug', $this->isDebug));
+        ini_set(
+            'display_errors',
+            $this->environment === 'local' && $this->isDebug ? 'On' : 'Off',
+        );
+        $this->initialized = true;
+        return self::setInstance($this);
+    }
+
+    private function bindExceptionHandling(): void
+    {
         if (!$this->bound(ExceptionReporter::class)) {
             $this->singleton(ExceptionReporter::class, ErrorLogExceptionReporter::class);
         }
-        $this->loadConfig($this);
-        $this->initialized = true;
-        return self::setInstance($this);
+        if (!$this->bound(ExceptionRenderer::class)) {
+            $this->singleton(ExceptionRenderer::class, SafeExceptionRenderer::class);
+        }
     }
 
     public function loadRoute(): void

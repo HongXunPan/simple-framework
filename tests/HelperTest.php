@@ -5,14 +5,17 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 use HongXunPan\Framework\Core\Application;
+use HongXunPan\Framework\Config\Config;
+use HongXunPan\Framework\Config\Env;
 use HongXunPan\Framework\Event\Exception\EventConfigException;
 use HongXunPan\Framework\Event\Exception\EventConsumeException;
 use HongXunPan\Framework\Event\Exception\EventException;
 use HongXunPan\Framework\Event\Exception\EventPublishException;
 use HongXunPan\Framework\Exceptions\ErrorLogExceptionReporter;
+use HongXunPan\Framework\Exceptions\ExceptionRenderer;
 use HongXunPan\Framework\Exceptions\ExceptionReporter;
-use HongXunPan\Tools\Config\Config;
-use HongXunPan\Tools\Env\Env;
+use HongXunPan\Framework\Exceptions\SafeExceptionRenderer;
+use HongXunPan\Tools\Config\Config as LegacyConfig;
 use RuntimeException;
 use Throwable;
 
@@ -32,11 +35,7 @@ final class RecordingExceptionReporter implements ExceptionReporter
  */
 function bootHelperApplication(array $singletons = []): Application
 {
-    putenv('DEBUG=false');
-    $loaded = (new ReflectionClass(Env::class))->getProperty('loaded');
-    $loaded->setValue(null, true);
-
-    Config::$config = [
+    $config = [
         'app' => ['timezone' => 'Asia/Shanghai'],
         'singleton' => $singletons,
         'boot' => [],
@@ -44,6 +43,8 @@ function bootHelperApplication(array $singletons = []): Application
 
     $application = new Application();
     Application::setInstance($application);
+    $application->instance(Env::class, Env::fromArray(['DEBUG' => false]));
+    $application->instance(Config::class, Config::fromArray($config));
     $application->init('/tmp/simple-framework-helper-tests');
 
     return $application;
@@ -73,6 +74,23 @@ $runHelper('Application 默认绑定异常上报器', static function (): void {
     if (!app(ExceptionReporter::class) instanceof ErrorLogExceptionReporter) {
         throw new RuntimeException('Application 未绑定默认异常上报器');
     }
+});
+
+$runHelper('Application 默认绑定安全异常渲染器', static function (): void {
+    bootHelperApplication();
+    if (!app(ExceptionRenderer::class) instanceof SafeExceptionRenderer) {
+        throw new RuntimeException('Application 未绑定默认安全异常渲染器');
+    }
+});
+
+$runHelper('未绑定核心 Config 时兼容旧 Config 入口', static function () use ($helperAssertSame): void {
+    $application = new Application();
+    Application::setInstance($application);
+    LegacyConfig::$config = [
+        'legacy' => ['enabled' => true],
+    ];
+
+    $helperAssertSame(true, config('legacy.enabled'), '旧 Config 兼容入口失效');
 });
 
 $runHelper('Event 异常共享可识别基类', static function (): void {
