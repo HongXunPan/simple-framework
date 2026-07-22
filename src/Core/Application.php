@@ -64,7 +64,7 @@ class Application extends Container
     {
         $cachePath = $this->getPath('base', 'bootstrap/cache');
         $cacheFile = 'routes.php';
-        if (file_exists($cacheFile . $cacheFile)) {
+        if (file_exists($cachePath . $cacheFile)) {
             if (!$this->isDebug) {
                 Route::loadCache($cachePath . $cacheFile);
                 return;
