@@ -49,6 +49,7 @@ final class ModuleCommandRunner
                 'module:refresh' => $this->refresh($positionals, $dryRun),
                 'module:disable' => $this->disable($positionals, $dryRun),
                 'module:status' => $this->status($positionals, $dryRun),
+                'module:publish' => $this->publish($positionals, $dryRun),
                 'help', '--help', '-h' => $this->help(),
                 default => throw new ModuleException("未知命令：{$name}"),
             };
@@ -109,6 +110,20 @@ final class ModuleCommandRunner
         ))->run($name);
     }
 
+    /** @param list<string> $arguments */
+    private function publish(array $arguments, bool $dryRun): int
+    {
+        if (count($arguments) !== 2) {
+            throw new ModuleException('用法：module:publish <name> <resource>');
+        }
+        return (new ModulePublishCommand(
+            $this->projectPath,
+            $this->registry,
+            $this->config,
+            $this->output,
+        ))->run($arguments[0], $arguments[1], $dryRun);
+    }
+
     private function help(): int
     {
         $this->output->line('Simple Module 命令：');
@@ -116,6 +131,7 @@ final class ModuleCommandRunner
         $this->output->line('  module:refresh [name] [--dry-run]');
         $this->output->line('  module:disable <name> [--dry-run]');
         $this->output->line('  module:status [name]');
+        $this->output->line('  module:publish <name> <resource> [--dry-run]');
         return 0;
     }
 

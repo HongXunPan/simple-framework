@@ -20,6 +20,16 @@ composer require hongxunpan/simple-framework
 
 正常应用启动始终使用 framework Config / Env。当前版本仅在核心实例尚未绑定时回退到 `php-tools` 旧入口，用于已有脚本迁移；新代码不得继续依赖该回退路径。
 
+## 原子文件操作
+
+框架提供 `HongXunPan\Framework\Filesystem\AtomicFile`：
+
+- `read()`：读取文件并将失败转为明确异常；
+- `replace()`：在目标目录内原子替换文件；
+- `create()`：原子创建且不覆盖已有文件。
+
+调用方负责目录创建与路径边界校验；`AtomicFile` 不隐式创建目录，也不决定“已有内容相同是否幂等”等上层策略。
+
 ## 默认异常处理
 
 默认 `ErrorHandler` 先调用 `ExceptionReporter`，再调用 `ExceptionRenderer`。完整异常只进入 Reporter，默认 `SafeExceptionRenderer` 对 HTTP 请求返回状态码 500 和 `Internal Server Error`，不输出异常消息、绝对路径或堆栈。
@@ -52,11 +62,14 @@ php bin/simple module:enable <name>
 php bin/simple module:refresh [name]
 php bin/simple module:disable <name>
 php bin/simple module:status [name]
+php bin/simple module:publish <name> <resource>
 ```
+
+Module 可通过包内 `config/resources.php` 声明命名资源。`module:publish` 只创建不存在的项目文件；内容相同时保持幂等，内容不同时停止并保留项目文件，不提供默认覆盖。
 
 `ModuleCommandRunner` 只负责解析和分发上述 `module:*` 命令；通用输出继续由 `Console\Output` 承接，不提前建立面向所有 CLI 能力的总控 Console。
 
-前三个写入类命令支持 `--dry-run`。CLI 使用不执行 Composer `autoload.files` 的受限自动加载，因此 Installer 不得依赖全局帮助函数；运行时只读取 `config/module.php`，不会扫描 Composer 包、执行 Installer 或修改项目文件。Module 命令读取完整配置、替换 `module.enable` 后原子规范化写回，并保留 `module.provider-override` 的类名列表；写入成功后清理可能存在的配置缓存。
+`module:enable`、`module:refresh`、`module:disable` 和 `module:publish` 支持 `--dry-run`。CLI 使用不执行 Composer `autoload.files` 的受限自动加载，因此 Installer 与资源声明不得依赖全局帮助函数；运行时只读取 `config/module.php`，不会扫描 Composer 包、执行 Installer 或修改项目文件。Module 命令读取完整配置、替换 `module.enable` 后原子规范化写回，并保留 `module.provider-override` 的类名列表；写入成功后清理可能存在的配置缓存。
 
 Installer 的 `dryRun=true` 调用只能返回差异，不得写项目文件；正式 `install()`、`refresh()`、`upgrade()`、`uninstall()` 必须各自保证幂等和操作内失败回滚。命令层会先完成全量预检，并且只在 `install()` 成功后写入 Module 启用状态。
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HongXunPan\Framework\Config;
 
+use HongXunPan\Framework\Filesystem\AtomicFile;
 use RuntimeException;
 
 final class Config
@@ -113,23 +114,7 @@ final class Config
             throw new RuntimeException('配置缓存目录创建失败：' . $cacheDirectory);
         }
 
-        $temporaryFile = tempnam($cacheDirectory, 'config-');
-        if ($temporaryFile === false) {
-            throw new RuntimeException('配置缓存临时文件创建失败：' . $cacheDirectory);
-        }
-
         $content = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($this->items, true) . ";\n";
-        try {
-            if (file_put_contents($temporaryFile, $content, LOCK_EX) === false) {
-                throw new RuntimeException('配置缓存写入失败：' . $temporaryFile);
-            }
-            if (!rename($temporaryFile, $cacheFile)) {
-                throw new RuntimeException('配置缓存替换失败：' . $cacheFile);
-            }
-        } finally {
-            if (is_file($temporaryFile)) {
-                @unlink($temporaryFile);
-            }
-        }
+        AtomicFile::replace($cacheFile, $content);
     }
 }

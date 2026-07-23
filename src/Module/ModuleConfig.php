@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace HongXunPan\Framework\Module;
 
+use HongXunPan\Framework\Filesystem\AtomicFile;
 use HongXunPan\Framework\Module\Exception\ModuleException;
+use RuntimeException;
 
 final class ModuleConfig
 {
@@ -87,30 +89,19 @@ final class ModuleConfig
         $configuration['enable'] = $this->validateClassList($modules, 'module.enable');
         $content = $this->render($configuration);
 
-        $temporaryFile = tempnam($directory, 'module-');
-        if ($temporaryFile === false) {
-            throw new ModuleException('Module 配置临时文件创建失败：' . $directory);
+        try {
+            AtomicFile::replace($this->file(), $content, 0644);
+        } catch (RuntimeException $exception) {
+            throw new ModuleException(
+                'Module 配置原子替换失败：' . $exception->getMessage(),
+                0,
+                $exception,
+            );
         }
 
-        try {
-            if (file_put_contents($temporaryFile, $content, LOCK_EX) === false) {
-                throw new ModuleException('Module 配置写入失败：' . $temporaryFile);
-            }
-            if (!chmod($temporaryFile, 0644)) {
-                throw new ModuleException('Module 配置权限设置失败：' . $temporaryFile);
-            }
-            if (!rename($temporaryFile, $this->file())) {
-                throw new ModuleException('Module 配置原子替换失败：' . $this->file());
-            }
-
-            $cacheFile = $this->projectPath . DIRECTORY_SEPARATOR . 'bootstrap/cache/config.php';
-            if (is_file($cacheFile) && !unlink($cacheFile)) {
-                throw new ModuleException('Module 配置已更新，但配置缓存清理失败：' . $cacheFile);
-            }
-        } finally {
-            if (is_file($temporaryFile)) {
-                @unlink($temporaryFile);
-            }
+        $cacheFile = $this->projectPath . DIRECTORY_SEPARATOR . 'bootstrap/cache/config.php';
+        if (is_file($cacheFile) && !unlink($cacheFile)) {
+            throw new ModuleException('Module 配置已更新，但配置缓存清理失败：' . $cacheFile);
         }
     }
 

@@ -111,7 +111,7 @@ $runConfigEnv('Config 使用原子缓存并复用缓存内容', static function 
         file_put_contents($configPath . '/app.php', "<?php return ['name' => 'second'];\n");
         $cached = new Config($configPath, $cachePath, true);
         $configEnvAssertSame('first', $cached->get('app.name'), '未优先使用已有配置缓存');
-        $configEnvAssertSame([], glob($cachePath . '/config-*') ?: [], '遗留配置缓存临时文件');
+        $configEnvAssertSame([], glob($cachePath . '/.atomic-*') ?: [], '遗留配置缓存临时文件');
     } finally {
         removeConfigEnvDirectory($directory);
     }
