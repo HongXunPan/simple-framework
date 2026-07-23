@@ -9,6 +9,9 @@ use HongXunPan\Framework\Exceptions\ErrorHandler;
 use HongXunPan\Framework\Exceptions\ExceptionRenderer;
 use HongXunPan\Framework\Exceptions\ExceptionReporter;
 use HongXunPan\Framework\Exceptions\SafeExceptionRenderer;
+use HongXunPan\Framework\Module\HelperLoader;
+use HongXunPan\Framework\Module\ModuleConfig;
+use HongXunPan\Framework\Module\ModuleLoader;
 use HongXunPan\Framework\Response\ResponseContract;
 use HongXunPan\Framework\Route\Route;
 use Illuminate\Container\Container;
@@ -65,6 +68,7 @@ class Application extends Container
             'display_errors',
             $this->environment === 'local' && $this->isDebug ? 'On' : 'Off',
         );
+        $this->bootProviders();
         $this->initialized = true;
         return self::setInstance($this);
     }
@@ -77,6 +81,36 @@ class Application extends Container
         if (!$this->bound(ExceptionRenderer::class)) {
             $this->singleton(ExceptionRenderer::class, SafeExceptionRenderer::class);
         }
+    }
+
+    private function bootProviders(): void
+    {
+        if (!$this->bound(ModuleConfig::class)) {
+            $this->instance(ModuleConfig::class, new ModuleConfig($this->getPath('base')));
+        }
+        if (!$this->bound(HelperLoader::class)) {
+            $this->instance(HelperLoader::class, new HelperLoader());
+        }
+        if (!$this->bound(ModuleLoader::class)) {
+            $this->instance(ModuleLoader::class, new ModuleLoader(
+                $this,
+                $this->make(ModuleConfig::class),
+                $this->make(HelperLoader::class),
+            ));
+        }
+
+        /** @var ModuleLoader $loader */
+        $loader = $this->make(ModuleLoader::class);
+        $loader->registerModules();
+        $this->loadSingleton();
+
+        $projectProviders = config('module.provider-override', []);
+        if (!is_array($projectProviders) || !array_is_list($projectProviders)) {
+            throw new \RuntimeException("config('module.provider-override') 必须是 Provider 类名列表");
+        }
+        $loader->registerProjectProviders($projectProviders);
+        $loader->boot();
+        $this->loadBoot();
     }
 
     public function loadRoute(): void

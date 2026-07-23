@@ -26,6 +26,42 @@ composer require hongxunpan/simple-framework
 
 业务项目可以在 `config/singleton.php` 分别覆盖 Reporter 和 Renderer。现有 `Application::run($closure, ErrorHandler::class)` 静态处理器入口在兼容期继续有效。
 
+## Module 运行机制
+
+Module 契约和运行时加载机制属于 framework core。项目使用 `config('module.enable')` 记录已启用 Module，使用 `config('module.provider-override')` 登记项目级覆盖 Provider；Module 自己在包内维护 `config/providers.php` 和可选的 `config/helpers.php`。
+
+Module Composer 包必须声明：
+
+```json
+{
+    "type": "simple-module",
+    "extra": {
+        "simple": {
+            "module": "Vendor\\Package\\ExampleModule"
+        }
+    }
+}
+```
+
+`extra.simple.module` 指向实现 `HongXunPan\Framework\Module\Module` 的无参入口类。入口类的 `basePath()` 必须返回当前 Composer 包根目录。
+
+项目通过以下命令管理启用状态：
+
+```bash
+php bin/simple module:enable <name>
+php bin/simple module:refresh [name]
+php bin/simple module:disable <name>
+php bin/simple module:status [name]
+```
+
+`ModuleCommandRunner` 只负责解析和分发上述 `module:*` 命令；通用输出继续由 `Console\Output` 承接，不提前建立面向所有 CLI 能力的总控 Console。
+
+前三个写入类命令支持 `--dry-run`。CLI 使用不执行 Composer `autoload.files` 的受限自动加载，因此 Installer 不得依赖全局帮助函数；运行时只读取 `config/module.php`，不会扫描 Composer 包、执行 Installer 或修改项目文件。Module 命令读取完整配置、替换 `module.enable` 后原子规范化写回，并保留 `module.provider-override` 的类名列表；写入成功后清理可能存在的配置缓存。
+
+Installer 的 `dryRun=true` 调用只能返回差异，不得写项目文件；正式 `install()`、`refresh()`、`upgrade()`、`uninstall()` 必须各自保证幂等和操作内失败回滚。命令层会先完成全量预检，并且只在 `install()` 成功后写入 Module 启用状态。
+
+Provider 注册顺序为 Module Provider、旧 `config/singleton.php` 兼容绑定、`module.provider-override` 项目 Provider；随后依次执行 Provider `boot()`，最后执行旧 `config/boot.php`。项目 Provider 因此保留最终容器覆盖权，不替换或跳过 Module Provider。
+
 ## 全局异常上报与 rescue
 
 框架提供只上报、不生成响应的 `report()`，以及用于显式容错的通用 `rescue()`：

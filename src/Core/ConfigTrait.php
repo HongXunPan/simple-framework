@@ -21,9 +21,7 @@ trait ConfigTrait
         app(Config::class)->load();
         date_default_timezone_set((string) config('app.timezone', 'UTC'));
 
-        return $this
-            ->loadSingleton()
-            ->loadBoot();
+        return $this;
     }
 
     private function loadSingleton(): static
@@ -55,7 +53,7 @@ trait ConfigTrait
                     $class = $booter[0];
                     $method = $booter[1];
                     if (!method_exists($class, $method)) {
-                        throw new Exception("method not exit, $class::$method");
+                        throw new Exception("启动方法不存在：$class::$method");
                     }
                     $class::$method();
                     continue;
