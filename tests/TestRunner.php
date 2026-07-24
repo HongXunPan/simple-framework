@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/HelperTest.php';
+require __DIR__ . '/ResponseBindingTest.php';
 require __DIR__ . '/ConfigEnvTest.php';
 require __DIR__ . '/FilesystemTest.php';
 require __DIR__ . '/ModuleRuntimeTest.php';

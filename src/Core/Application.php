@@ -16,6 +16,7 @@ use HongXunPan\Framework\Lifecycle\RequestHandledSnapshot;
 use HongXunPan\Framework\Module\HelperLoader;
 use HongXunPan\Framework\Module\ModuleConfig;
 use HongXunPan\Framework\Module\ModuleLoader;
+use HongXunPan\Framework\Response\Response;
 use HongXunPan\Framework\Response\ResponseContract;
 use HongXunPan\Framework\Route\Route;
 use Illuminate\Container\Container;
@@ -66,8 +67,7 @@ class Application extends Container
         $this->isCli = in_array(PHP_SAPI, ['cli', 'phpdbg'], true);
         error_reporting(E_ALL);
         ini_set('display_errors', 'Off');
-        $this->bindExceptionHandling();
-        $this->bindApplicationLifecycle();
+        $this->bindDefaults();
         if (!$this->bound(Env::class)) {
             $this->instance(Env::class, new Env($this->getPath('base') . '.env'));
         }
@@ -86,21 +86,12 @@ class Application extends Container
         return self::setInstance($this);
     }
 
-    private function bindExceptionHandling(): void
+    private function bindDefaults(): void
     {
-        if (!$this->bound(ExceptionReporter::class)) {
-            $this->singleton(ExceptionReporter::class, ErrorLogExceptionReporter::class);
-        }
-        if (!$this->bound(ExceptionRenderer::class)) {
-            $this->singleton(ExceptionRenderer::class, SafeExceptionRenderer::class);
-        }
-    }
-
-    private function bindApplicationLifecycle(): void
-    {
-        if (!$this->bound(ApplicationLifecycle::class)) {
-            $this->singleton(ApplicationLifecycle::class, NullApplicationLifecycle::class);
-        }
+        $this->singletonIf(ResponseContract::class, Response::class);
+        $this->singletonIf(ExceptionReporter::class, ErrorLogExceptionReporter::class);
+        $this->singletonIf(ExceptionRenderer::class, SafeExceptionRenderer::class);
+        $this->singletonIf(ApplicationLifecycle::class, NullApplicationLifecycle::class);
     }
 
     private function notifyLifecycle(Closure $notification): void
@@ -118,19 +109,21 @@ class Application extends Container
 
     private function bootProviders(): void
     {
-        if (!$this->bound(ModuleConfig::class)) {
-            $this->instance(ModuleConfig::class, new ModuleConfig($this->getPath('base')));
-        }
-        if (!$this->bound(HelperLoader::class)) {
-            $this->instance(HelperLoader::class, new HelperLoader());
-        }
-        if (!$this->bound(ModuleLoader::class)) {
-            $this->instance(ModuleLoader::class, new ModuleLoader(
-                $this,
-                $this->make(ModuleConfig::class),
-                $this->make(HelperLoader::class),
-            ));
-        }
+        $this->singletonIf(
+            ModuleConfig::class,
+            static fn (Application $app): ModuleConfig =>
+                new ModuleConfig($app->getPath('base')),
+        );
+        $this->singletonIf(HelperLoader::class);
+        $this->singletonIf(
+            ModuleLoader::class,
+            static fn (Application $app): ModuleLoader =>
+                new ModuleLoader(
+                    $app,
+                    $app->make(ModuleConfig::class),
+                    $app->make(HelperLoader::class),
+                ),
+        );
 
         /** @var ModuleLoader $loader */
         $loader = $this->make(ModuleLoader::class);

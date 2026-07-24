@@ -4,8 +4,6 @@ namespace HongXunPan\Framework\Core;
 
 use Exception;
 use HongXunPan\Framework\Config\Config;
-use HongXunPan\Framework\Response\Response;
-use HongXunPan\Framework\Response\ResponseContract;
 
 trait ConfigTrait
 {
@@ -27,9 +25,7 @@ trait ConfigTrait
     private function loadSingleton(): static
     {
         //singleton
-        $singletons = config('singleton', [
-            ResponseContract::class => Response::class,
-        ]);
+        $singletons = config('singleton', []);
         foreach ($singletons as $key => $value) {
             if (is_int($key)) {
                 app()->singleton($value);
