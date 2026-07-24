@@ -7,6 +7,8 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 use HongXunPan\Framework\Config\Config;
 use HongXunPan\Framework\Config\Env;
 use HongXunPan\Framework\Core\Application;
+use HongXunPan\Framework\Core\Request;
+use HongXunPan\Framework\Provider\ServiceProvider;
 use HongXunPan\Framework\Response\Response;
 use HongXunPan\Framework\Response\ResponseContract;
 use RuntimeException;
@@ -24,22 +26,25 @@ final class FrameworkProjectResponse implements ResponseContract
     }
 }
 
-/**
- * @param array<class-string, class-string>|null $singletons
- */
-function bootResponseBindingApplication(?array $singletons = null): Application
+final class FrameworkProjectResponseProvider extends ServiceProvider
+{
+    public function register(Application $app): void
+    {
+        $app->singleton(ResponseContract::class, FrameworkProjectResponse::class);
+    }
+}
+
+function bootResponseBindingApplication(bool $projectOverride = false): Application
 {
     $config = [
         'app' => ['timezone' => 'Asia/Shanghai'],
-        'boot' => [],
         'module' => [
             'enable' => [],
-            'provider-override' => [],
+            'provider-override' => $projectOverride
+                ? [FrameworkProjectResponseProvider::class]
+                : [],
         ],
     ];
-    if ($singletons !== null) {
-        $config['singleton'] = $singletons;
-    }
 
     $application = new Application();
     Application::setInstance($application);
@@ -77,7 +82,7 @@ $runResponseBinding = static function (
     }
 };
 
-$runResponseBinding('Application 在项目未声明 singleton 时提供默认响应', static function (): void {
+$runResponseBinding('Application 在项目未覆盖时提供默认响应', static function (): void {
     $application = bootResponseBindingApplication();
     $response = $application->make(ResponseContract::class, ['content' => 'framework']);
 
@@ -89,22 +94,22 @@ $runResponseBinding('Application 在项目未声明 singleton 时提供默认响
     }
 });
 
-$runResponseBinding('Application 在空 singleton 配置下仍提供默认响应', static function (): void {
-    $application = bootResponseBindingApplication([]);
-
-    if (!$application->make(ResponseContract::class, ['content' => []]) instanceof Response) {
-        throw new RuntimeException('空 singleton 配置覆盖了 framework 默认 Response');
+$runResponseBinding('Application 默认提供 Request 单例', static function (): void {
+    $application = bootResponseBindingApplication();
+    if (!$application->isShared(Request::class)) {
+        throw new RuntimeException('Application 未将 Request 声明为单例');
+    }
+    if ($application->make(Request::class) !== $application->make(Request::class)) {
+        throw new RuntimeException('Application 多次解析得到不同 Request 实例');
     }
 });
 
-$runResponseBinding('项目 singleton 配置可以覆盖 framework 默认响应', static function (): void {
-    $application = bootResponseBindingApplication([
-        ResponseContract::class => FrameworkProjectResponse::class,
-    ]);
+$runResponseBinding('项目 Provider 可以覆盖 framework 默认响应', static function (): void {
+    $application = bootResponseBindingApplication(true);
     $response = $application->make(ResponseContract::class, ['content' => 'custom']);
 
     if (!$response instanceof FrameworkProjectResponse) {
-        throw new RuntimeException('项目 singleton 配置未覆盖 framework 默认 Response');
+        throw new RuntimeException('项目 Provider 未覆盖 framework 默认 Response');
     }
     if (captureFrameworkResponse(static fn () => $response->send()) !== 'project:custom') {
         throw new RuntimeException('项目 Response 未收到运行时 content');

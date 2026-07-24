@@ -92,6 +92,7 @@ class Application extends Container
         $this->singletonIf(ExceptionReporter::class, ErrorLogExceptionReporter::class);
         $this->singletonIf(ExceptionRenderer::class, SafeExceptionRenderer::class);
         $this->singletonIf(ApplicationLifecycle::class, NullApplicationLifecycle::class);
+        $this->singletonIf(Request::class);
     }
 
     private function notifyLifecycle(Closure $notification): void
@@ -128,7 +129,6 @@ class Application extends Container
         /** @var ModuleLoader $loader */
         $loader = $this->make(ModuleLoader::class);
         $loader->registerModules();
-        $this->loadSingleton();
 
         $projectProviders = config('module.provider-override', []);
         if (!is_array($projectProviders) || !array_is_list($projectProviders)) {
@@ -136,7 +136,6 @@ class Application extends Container
         }
         $loader->registerProjectProviders($projectProviders);
         $loader->boot();
-        $this->loadBoot();
     }
 
     public function loadRoute(): void

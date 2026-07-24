@@ -11,6 +11,7 @@ use HongXunPan\Framework\Exceptions\ErrorLogExceptionReporter;
 use HongXunPan\Framework\Exceptions\ExceptionRenderer;
 use HongXunPan\Framework\Exceptions\ExceptionReporter;
 use HongXunPan\Framework\Exceptions\SafeExceptionRenderer;
+use HongXunPan\Framework\Provider\ServiceProvider;
 use RuntimeException;
 use Throwable;
 
@@ -25,15 +26,24 @@ final class RecordingExceptionReporter implements ExceptionReporter
     }
 }
 
-/**
- * @param array<class-string, class-string> $singletons
- */
-function bootHelperApplication(array $singletons = []): Application
+final class RecordingExceptionReporterProvider extends ServiceProvider
+{
+    public function register(Application $app): void
+    {
+        $app->singleton(ExceptionReporter::class, RecordingExceptionReporter::class);
+    }
+}
+
+function bootHelperApplication(bool $customReporter = false): Application
 {
     $config = [
         'app' => ['timezone' => 'Asia/Shanghai'],
-        'singleton' => $singletons,
-        'boot' => [],
+        'module' => [
+            'enable' => [],
+            'provider-override' => $customReporter
+                ? [RecordingExceptionReporterProvider::class]
+                : [],
+        ],
     ];
 
     $application = new Application();
@@ -78,19 +88,15 @@ $runHelper('Application 默认绑定安全异常渲染器', static function (): 
     }
 });
 
-$runHelper('业务配置可以覆盖默认异常上报器', static function (): void {
-    bootHelperApplication([
-        ExceptionReporter::class => RecordingExceptionReporter::class,
-    ]);
+$runHelper('项目 Provider 可以覆盖默认异常上报器', static function (): void {
+    bootHelperApplication(true);
     if (!app(ExceptionReporter::class) instanceof RecordingExceptionReporter) {
-        throw new RuntimeException('业务配置未覆盖默认异常上报器');
+        throw new RuntimeException('项目 Provider 未覆盖默认异常上报器');
     }
 });
 
 $runHelper('report 委托给容器中的异常上报器', static function () use ($helperAssertSame): void {
-    bootHelperApplication([
-        ExceptionReporter::class => RecordingExceptionReporter::class,
-    ]);
+    bootHelperApplication(true);
     $throwable = new RuntimeException('测试异常上报');
 
     report($throwable);
@@ -101,9 +107,7 @@ $runHelper('report 委托给容器中的异常上报器', static function () use
 });
 
 $runHelper('rescue 成功时返回原结果且不上报', static function () use ($helperAssertSame): void {
-    bootHelperApplication([
-        ExceptionReporter::class => RecordingExceptionReporter::class,
-    ]);
+    bootHelperApplication(true);
 
     $result = rescue(static fn (): int => 42, fallback: 0);
 
@@ -114,9 +118,7 @@ $runHelper('rescue 成功时返回原结果且不上报', static function () use
 });
 
 $runHelper('rescue 失败时上报并返回固定 fallback', static function () use ($helperAssertSame): void {
-    bootHelperApplication([
-        ExceptionReporter::class => RecordingExceptionReporter::class,
-    ]);
+    bootHelperApplication(true);
     $throwable = new RuntimeException('测试 rescue 失败');
 
     $result = rescue(static fn () => throw $throwable, fallback: false);
@@ -128,9 +130,7 @@ $runHelper('rescue 失败时上报并返回固定 fallback', static function () 
 });
 
 $runHelper('rescue 支持 callable fallback', static function () use ($helperAssertSame): void {
-    bootHelperApplication([
-        ExceptionReporter::class => RecordingExceptionReporter::class,
-    ]);
+    bootHelperApplication(true);
     $throwable = new RuntimeException('测试 callable fallback');
 
     $result = rescue(
@@ -142,9 +142,7 @@ $runHelper('rescue 支持 callable fallback', static function () use ($helperAss
 });
 
 $runHelper('rescue 支持关闭或按条件上报', static function () use ($helperAssertSame): void {
-    bootHelperApplication([
-        ExceptionReporter::class => RecordingExceptionReporter::class,
-    ]);
+    bootHelperApplication(true);
 
     rescue(static fn () => throw new RuntimeException('关闭上报'), report: false);
     rescue(

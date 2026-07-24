@@ -12,6 +12,7 @@ PHP `^8.5`。
 - Module 发现、启用、禁用、刷新与资源发布；
 - 原子文件操作；
 - 核心全局函数 `app()`、`config()`、`env()`、`report()`、`rescue()`。
+- Request 核心单例。
 
 数据库、Redis、Eloquent、Event 等可选基础设施不属于 framework core。
 
@@ -54,15 +55,21 @@ $timezone = config('app.timezone', 'UTC');
 完整异常只进入 Reporter；默认 `SafeExceptionRenderer` 对 HTTP 请求返回状态码 500 和
 `Internal Server Error`，不会输出异常消息、绝对路径或堆栈。
 
-项目可以在 `config/singleton.php` 覆盖：
+项目通过 `module.provider-override` 中的 Provider 覆盖：
 
 ```php
 use App\Exceptions\BusinessExceptionReporter;
+use HongXunPan\Framework\Core\Application;
 use HongXunPan\Framework\Exceptions\ExceptionReporter;
+use HongXunPan\Framework\Provider\ServiceProvider;
 
-return [
-    ExceptionReporter::class => BusinessExceptionReporter::class,
-];
+final class AppServiceProvider extends ServiceProvider
+{
+    public function register(Application $app): void
+    {
+        $app->singleton(ExceptionReporter::class, BusinessExceptionReporter::class);
+    }
+}
 ```
 
 框架还提供：
@@ -140,11 +147,10 @@ php bin/simple module:publish <name> <resource>
 
 Provider 顺序为：
 
-1. Module Provider；
-2. 旧 `config/singleton.php` 兼容绑定；
+1. framework 默认绑定；
+2. Module Provider；
 3. `module.provider-override` 项目 Provider；
-4. Provider `boot()`；
-5. 旧 `config/boot.php`。
+4. Provider `boot()`。
 
 项目 Provider 因此保留最终容器覆盖权。
 

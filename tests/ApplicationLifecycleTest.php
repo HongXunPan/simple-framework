@@ -78,8 +78,6 @@ function bootApplicationLifecycle(?ApplicationLifecycle $lifecycle = null): arra
     $application->instance(Env::class, Env::fromArray(['APP_DEBUG' => false]));
     $application->instance(Config::class, Config::fromArray([
         'app' => ['timezone' => 'Asia/Shanghai'],
-        'singleton' => [],
-        'boot' => [],
         'module' => [
             'enable' => [],
             'provider-override' => [],

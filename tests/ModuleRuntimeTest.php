@@ -23,10 +23,6 @@ final class ModuleRuntimeState
         self::$steps = [];
     }
 
-    public static function legacyBoot(): void
-    {
-        self::$steps[] = 'legacy-boot';
-    }
 }
 
 final class RuntimeModule implements Module
@@ -166,11 +162,6 @@ function writeModuleRuntimeProject(string $projectPath, array $providers = []): 
         $projectPath . '/config/app.php',
         "<?php return ['env' => 'production', 'debug' => false, 'timezone' => 'Asia/Shanghai'];\n",
     );
-    file_put_contents($projectPath . '/config/singleton.php', "<?php return [];\n");
-    file_put_contents(
-        $projectPath . '/config/boot.php',
-        "<?php return [[ModuleRuntimeState::class, 'legacyBoot']];\n",
-    );
     file_put_contents(
         $projectPath . '/config/module.php',
         "<?php return ['enable' => [], 'provider-override' => "
@@ -271,9 +262,9 @@ $runModuleRuntime('Module Provider 先于项目 Provider 且项目保留覆盖�
         $moduleRuntimeAssertSame('project', $application->make('module.runtime.value'), '项目 Provider 未覆盖 Module');
         $moduleRuntimeAssertSame('helper', p1_runtime_module_value(), 'Module Helper 未加载');
         $moduleRuntimeAssertSame(
-            ['module-register', 'project-register', 'module-boot', 'project-boot', 'legacy-boot'],
+            ['module-register', 'project-register', 'module-boot', 'project-boot'],
             ModuleRuntimeState::$steps,
-            'Provider 与旧 boot 执行顺序错误',
+            'Provider 执行顺序错误',
         );
     } finally {
         removeModuleRuntimeDirectory($directory);
@@ -346,4 +337,4 @@ if ($moduleRuntimeFailures !== []) {
     exit(1);
 }
 
-echo 'Module 配置、Provider、Helper 与兼容启动链测试通过。' . PHP_EOL;
+echo 'Module 配置、Provider、Helper 与运行时启动链测试通过。' . PHP_EOL;

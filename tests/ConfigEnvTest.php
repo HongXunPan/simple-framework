@@ -125,9 +125,6 @@ $runConfigEnv('Application 无 env 文件也能初始化', static function () us
             $directory . '/config/app.php',
             "<?php return ['env' => env('APP_ENV', 'production'), 'debug' => env('APP_DEBUG', false), 'timezone' => 'Asia/Shanghai'];\n",
         );
-        file_put_contents($directory . '/config/singleton.php', "<?php return [];\n");
-        file_put_contents($directory . '/config/boot.php', "<?php return [];\n");
-
         $application = new Application();
         $application->init($directory);
 
