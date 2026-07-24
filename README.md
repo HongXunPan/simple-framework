@@ -30,11 +30,23 @@ composer require hongxunpan/simple-framework
 
 调用方负责目录创建与路径边界校验；`AtomicFile` 不隐式创建目录，也不决定“已有内容相同是否幂等”等上层策略。
 
-## 默认异常处理
+## 异常处理与应用生命周期
+
+### 默认异常处理
 
 默认 `ErrorHandler` 先调用 `ExceptionReporter`，再调用 `ExceptionRenderer`。完整异常只进入 Reporter，默认 `SafeExceptionRenderer` 对 HTTP 请求返回状态码 500 和 `Internal Server Error`，不输出异常消息、绝对路径或堆栈。
 
 业务项目可以在 `config/singleton.php` 分别覆盖 Reporter 和 Renderer。现有 `Application::run($closure, ErrorHandler::class)` 静态处理器入口在兼容期继续有效。
+
+### Application 生命周期
+
+框架通过 `ApplicationLifecycle` 提供应用运行完成与异常发生两个稳定触发点，默认绑定 `NullApplicationLifecycle`，未安装相关 Module 时不会产生额外行为。
+
+- `requestHandled(RequestHandledSnapshot)`：`Application::run()` 内的业务闭包正常完成后触发；
+- `exceptionOccurred(ExceptionOccurredSnapshot)`：业务闭包抛出异常后、进入原异常处理链前触发，Snapshot 保留同一个原始 `Throwable`；
+- 生命周期实现自身失败只通过 `ExceptionReporter` 上报，不覆盖原业务异常，也不把成功请求改写成错误响应。
+
+当前 `RequestHandledSnapshot` 只表达完成事实，不暴露尚未形成稳定容器契约的可变 Request / Response。Module 或项目可以通过容器覆盖 `ApplicationLifecycle`，framework core 不直接依赖具体事件包。
 
 ## Module 运行机制
 

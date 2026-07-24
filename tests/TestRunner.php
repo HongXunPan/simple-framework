@@ -9,6 +9,7 @@ require __DIR__ . '/ModuleRuntimeTest.php';
 require __DIR__ . '/ModuleCommandTest.php';
 require __DIR__ . '/ModulePublishTest.php';
 require __DIR__ . '/ExceptionHandlerTest.php';
+require __DIR__ . '/ApplicationLifecycleTest.php';
 require __DIR__ . '/SyncEventTest.php';
 require __DIR__ . '/SerializationTest.php';
 require __DIR__ . '/SerializationProtocolTest.php';

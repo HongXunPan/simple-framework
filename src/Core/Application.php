@@ -9,6 +9,10 @@ use HongXunPan\Framework\Exceptions\ErrorHandler;
 use HongXunPan\Framework\Exceptions\ExceptionRenderer;
 use HongXunPan\Framework\Exceptions\ExceptionReporter;
 use HongXunPan\Framework\Exceptions\SafeExceptionRenderer;
+use HongXunPan\Framework\Lifecycle\ApplicationLifecycle;
+use HongXunPan\Framework\Lifecycle\ExceptionOccurredSnapshot;
+use HongXunPan\Framework\Lifecycle\NullApplicationLifecycle;
+use HongXunPan\Framework\Lifecycle\RequestHandledSnapshot;
 use HongXunPan\Framework\Module\HelperLoader;
 use HongXunPan\Framework\Module\ModuleConfig;
 use HongXunPan\Framework\Module\ModuleLoader;
@@ -32,7 +36,15 @@ class Application extends Container
     {
         try {
             $closure($this);
+            $this->notifyLifecycle(
+                static fn (ApplicationLifecycle $lifecycle) =>
+                    $lifecycle->requestHandled(new RequestHandledSnapshot()),
+            );
         } catch (Throwable $throwable) {
+            $this->notifyLifecycle(
+                static fn (ApplicationLifecycle $lifecycle) =>
+                    $lifecycle->exceptionOccurred(new ExceptionOccurredSnapshot($throwable)),
+            );
             if ($errHandlerClass && class_exists($errHandlerClass)) {
                 call_user_func([$errHandlerClass, 'handle'], $throwable);
                 return;
@@ -55,6 +67,7 @@ class Application extends Container
         error_reporting(E_ALL);
         ini_set('display_errors', 'Off');
         $this->bindExceptionHandling();
+        $this->bindApplicationLifecycle();
         if (!$this->bound(Env::class)) {
             $this->instance(Env::class, new Env($this->getPath('base') . '.env'));
         }
@@ -80,6 +93,26 @@ class Application extends Container
         }
         if (!$this->bound(ExceptionRenderer::class)) {
             $this->singleton(ExceptionRenderer::class, SafeExceptionRenderer::class);
+        }
+    }
+
+    private function bindApplicationLifecycle(): void
+    {
+        if (!$this->bound(ApplicationLifecycle::class)) {
+            $this->singleton(ApplicationLifecycle::class, NullApplicationLifecycle::class);
+        }
+    }
+
+    private function notifyLifecycle(Closure $notification): void
+    {
+        if (!$this->bound(ApplicationLifecycle::class)) {
+            return;
+        }
+
+        try {
+            $notification($this->make(ApplicationLifecycle::class));
+        } catch (Throwable $throwable) {
+            report($throwable);
         }
     }
 
