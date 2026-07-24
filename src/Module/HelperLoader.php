@@ -18,7 +18,6 @@ final class HelperLoader
         'app',
         'config',
         'env',
-        'event',
         'report',
         'rescue',
     ];

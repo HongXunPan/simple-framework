@@ -3,11 +3,7 @@
 use HongXunPan\Framework\Core\Application;
 use HongXunPan\Framework\Config\Config;
 use HongXunPan\Framework\Config\Env;
-use HongXunPan\Framework\Event\Dispatch\Dispatcher;
-use HongXunPan\Framework\Event\Event;
 use HongXunPan\Framework\Exceptions\ExceptionReporter;
-use HongXunPan\Tools\Config\Config as LegacyConfig;
-use HongXunPan\Tools\Env\Env as LegacyEnv;
 use Illuminate\Contracts\Container\BindingResolutionException;
 
 if (!function_exists('app')) {
@@ -38,12 +34,7 @@ if (!function_exists('env')) {
      */
     function env(string $key, mixed $default = null): mixed
     {
-        $application = Application::getInstance();
-        if ($application->bound(Env::class)) {
-            return $application->make(Env::class)->get($key, $default);
-        }
-
-        return LegacyEnv::get($key, $default);
+        return Application::getInstance()->make(Env::class)->get($key, $default);
     }
 }
 
@@ -55,19 +46,7 @@ if (!function_exists('config')) {
      */
     function config(string $key = '', mixed $default = ''): mixed
     {
-        $application = Application::getInstance();
-        if ($application->bound(Config::class)) {
-            return $application->make(Config::class)->get($key, $default);
-        }
-
-        return LegacyConfig::getInstance()->getConfig($key, $default);
-    }
-}
-
-if (!function_exists('event')) {
-    function event(Event $event): void
-    {
-        app(Dispatcher::class)->dispatch($event);
+        return Application::getInstance()->make(Config::class)->get($key, $default);
     }
 }
 

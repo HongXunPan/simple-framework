@@ -7,15 +7,10 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 use HongXunPan\Framework\Core\Application;
 use HongXunPan\Framework\Config\Config;
 use HongXunPan\Framework\Config\Env;
-use HongXunPan\Framework\Event\Exception\EventConfigException;
-use HongXunPan\Framework\Event\Exception\EventConsumeException;
-use HongXunPan\Framework\Event\Exception\EventException;
-use HongXunPan\Framework\Event\Exception\EventPublishException;
 use HongXunPan\Framework\Exceptions\ErrorLogExceptionReporter;
 use HongXunPan\Framework\Exceptions\ExceptionRenderer;
 use HongXunPan\Framework\Exceptions\ExceptionReporter;
 use HongXunPan\Framework\Exceptions\SafeExceptionRenderer;
-use HongXunPan\Tools\Config\Config as LegacyConfig;
 use RuntimeException;
 use Throwable;
 
@@ -80,30 +75,6 @@ $runHelper('Application 默认绑定安全异常渲染器', static function (): 
     bootHelperApplication();
     if (!app(ExceptionRenderer::class) instanceof SafeExceptionRenderer) {
         throw new RuntimeException('Application 未绑定默认安全异常渲染器');
-    }
-});
-
-$runHelper('未绑定核心 Config 时兼容旧 Config 入口', static function () use ($helperAssertSame): void {
-    $application = new Application();
-    Application::setInstance($application);
-    LegacyConfig::$config = [
-        'legacy' => ['enabled' => true],
-    ];
-
-    $helperAssertSame(true, config('legacy.enabled'), '旧 Config 兼容入口失效');
-});
-
-$runHelper('Event 异常共享可识别基类', static function (): void {
-    $exceptions = [
-        new EventConfigException('配置异常'),
-        new EventPublishException('发布异常'),
-        new EventConsumeException('消费异常'),
-    ];
-
-    foreach ($exceptions as $exception) {
-        if (!$exception instanceof EventException) {
-            throw new RuntimeException($exception::class . ' 未继承 EventException');
-        }
     }
 });
 

@@ -1,6 +1,19 @@
 # simple-framework
 
-`hongxunpan/simple-framework` 是面向 simple-php 项目的轻量框架内核，当前 `php85 / 0.2.x` 版本线要求 PHP `^8.5`。
+`hongxunpan/simple-framework` 是 simple-php 的轻量内核。当前 `0.3.x` 开发线要求
+PHP `^8.5`。
+
+框架只承载所有项目都需要的稳定能力：
+
+- 应用容器与启动流程；
+- Config / Env；
+- 路由、响应与异常处理；
+- 应用生命周期契约；
+- Module 发现、启用、禁用、刷新与资源发布；
+- 原子文件操作；
+- 核心全局函数 `app()`、`config()`、`env()`、`report()`、`rescue()`。
+
+数据库、Redis、Eloquent、Event 等可选基础设施不属于 framework core。
 
 ## 安装
 
@@ -10,47 +23,75 @@ composer require hongxunpan/simple-framework
 
 ## Config 与 Env
 
-框架核心提供容器单例 `Config`、`Env` 以及全局 `config()`、`env()`：
+框架提供容器单例：
+
+- `HongXunPan\Framework\Config\Config`
+- `HongXunPan\Framework\Config\Env`
+
+以及全局函数：
+
+```php
+$environment = env('APP_ENV', 'production');
+$timezone = config('app.timezone', 'UTC');
+```
+
+行为约定：
 
 - 进程环境变量优先于项目 `.env`；
-- `.env` 不存在时使用调用方默认值，不阻断应用启动；
-- 配置支持点号路径读取；
+- `.env` 不存在时使用调用方默认值；
+- 配置支持点号路径；
 - 非调试环境可以生成原子配置缓存；
-- `APP_ENV`、`APP_DEBUG` 是推荐环境键，兼容期继续读取 `ENV_NAME`、`DEBUG`。
+- `APP_ENV`、`APP_DEBUG` 是推荐环境键；
+- 兼容期继续读取 `ENV_NAME`、`DEBUG`；
+- 不再回退到 `hongxunpan/php-tools` 的旧 Config / Env。
 
-正常应用启动始终使用 framework Config / Env。当前版本仅在核心实例尚未绑定时回退到 `php-tools` 旧入口，用于已有脚本迁移；新代码不得继续依赖该回退路径。
+`config()` 与 `env()` 依赖当前 `Application` 中的核心绑定。脱离应用启动流程的脚本应显式创建
+并绑定 `Config`、`Env`，不能依赖隐藏的全局配置状态。
 
-## 原子文件操作
+## 异常处理
 
-框架提供 `HongXunPan\Framework\Filesystem\AtomicFile`：
+默认 `ErrorHandler` 先调用 `ExceptionReporter`，再调用 `ExceptionRenderer`。
+完整异常只进入 Reporter；默认 `SafeExceptionRenderer` 对 HTTP 请求返回状态码 500 和
+`Internal Server Error`，不会输出异常消息、绝对路径或堆栈。
 
-- `read()`：读取文件并将失败转为明确异常；
-- `replace()`：在目标目录内原子替换文件；
-- `create()`：原子创建且不覆盖已有文件。
+项目可以在 `config/singleton.php` 覆盖：
 
-调用方负责目录创建与路径边界校验；`AtomicFile` 不隐式创建目录，也不决定“已有内容相同是否幂等”等上层策略。
+```php
+use App\Exceptions\BusinessExceptionReporter;
+use HongXunPan\Framework\Exceptions\ExceptionReporter;
 
-## 异常处理与应用生命周期
+return [
+    ExceptionReporter::class => BusinessExceptionReporter::class,
+];
+```
 
-### 默认异常处理
+框架还提供：
 
-默认 `ErrorHandler` 先调用 `ExceptionReporter`，再调用 `ExceptionRenderer`。完整异常只进入 Reporter，默认 `SafeExceptionRenderer` 对 HTTP 请求返回状态码 500 和 `Internal Server Error`，不输出异常消息、绝对路径或堆栈。
+```php
+report($throwable);
 
-业务项目可以在 `config/singleton.php` 分别覆盖 Reporter 和 Renderer。现有 `Application::run($closure, ErrorHandler::class)` 静态处理器入口在兼容期继续有效。
+$result = rescue(
+    static fn () => $service->runOptionalOperation(),
+    fallback: false,
+);
+```
 
-### Application 生命周期
+`rescue()` 只适合业务已经明确允许失败的旁路操作。关键写入、配置校验和 Module 发布仍应让
+异常向上传播。
 
-框架通过 `ApplicationLifecycle` 提供应用运行完成与异常发生两个稳定触发点，默认绑定 `NullApplicationLifecycle`，未安装相关 Module 时不会产生额外行为。
+## 应用生命周期
 
-- `requestHandled(RequestHandledSnapshot)`：`Application::run()` 内的业务闭包正常完成后触发；
-- `exceptionOccurred(ExceptionOccurredSnapshot)`：业务闭包抛出异常后、进入原异常处理链前触发，Snapshot 保留同一个原始 `Throwable`；
-- 生命周期实现自身失败只通过 `ExceptionReporter` 上报，不覆盖原业务异常，也不把成功请求改写成错误响应。
+`ApplicationLifecycle` 提供两个稳定触发点：
 
-当前 `RequestHandledSnapshot` 只表达完成事实，不暴露尚未形成稳定容器契约的可变 Request / Response。Module 或项目可以通过容器覆盖 `ApplicationLifecycle`，framework core 不直接依赖具体事件包。
+- `requestHandled(RequestHandledSnapshot)`：业务闭包正常完成后触发；
+- `exceptionOccurred(ExceptionOccurredSnapshot)`：业务闭包抛出异常后、进入原异常处理链前触发。
+
+框架默认绑定 `NullApplicationLifecycle`。生命周期实现自身失败只会上报，不覆盖原业务异常，
+也不会把成功请求改写成错误响应。
+
+可选 Module 可以覆盖生命周期契约；framework core 不依赖具体事件包。
 
 ## Module 运行机制
-
-Module 契约和运行时加载机制属于 framework core。项目使用 `config('module.enable')` 记录已启用 Module，使用 `config('module.provider-override')` 登记项目级覆盖 Provider；Module 自己在包内维护 `config/providers.php` 和可选的 `config/helpers.php`。
 
 Module Composer 包必须声明：
 
@@ -65,215 +106,92 @@ Module Composer 包必须声明：
 }
 ```
 
-`extra.simple.module` 指向实现 `HongXunPan\Framework\Module\Module` 的无参入口类。入口类的 `basePath()` 必须返回当前 Composer 包根目录。
+项目通过 `config/module.php` 维护：
 
-项目通过以下命令管理启用状态：
+```php
+return [
+    'enable' => [
+        Vendor\Package\ExampleModule::class,
+    ],
+    'provider-override' => [
+        App\Providers\ProjectServiceProvider::class,
+    ],
+];
+```
+
+Module 自己在包内维护：
+
+- `config/providers.php`
+- 可选的 `config/helpers.php`
+- 可选的 `config/resources.php`
+
+常用命令：
 
 ```bash
 php bin/simple module:enable <name>
-php bin/simple module:refresh [name]
 php bin/simple module:disable <name>
+php bin/simple module:refresh [name]
 php bin/simple module:status [name]
 php bin/simple module:publish <name> <resource>
 ```
 
-Module 可通过包内 `config/resources.php` 声明命名资源。`module:publish` 只创建不存在的项目文件；内容相同时保持幂等，内容不同时停止并保留项目文件，不提供默认覆盖。
+所有变更命令支持 `--dry-run`。Module 命令使用不执行 Composer `autoload.files` 的受限类加载，
+因此 Installer 和资源声明不得依赖全局帮助函数。
 
-`ModuleCommandRunner` 只负责解析和分发上述 `module:*` 命令；通用输出继续由 `Console\Output` 承接，不提前建立面向所有 CLI 能力的总控 Console。
+Provider 顺序为：
 
-`module:enable`、`module:refresh`、`module:disable` 和 `module:publish` 支持 `--dry-run`。CLI 使用不执行 Composer `autoload.files` 的受限自动加载，因此 Installer 与资源声明不得依赖全局帮助函数；运行时只读取 `config/module.php`，不会扫描 Composer 包、执行 Installer 或修改项目文件。Module 命令读取完整配置、替换 `module.enable` 后原子规范化写回，并保留 `module.provider-override` 的类名列表；写入成功后清理可能存在的配置缓存。
+1. Module Provider；
+2. 旧 `config/singleton.php` 兼容绑定；
+3. `module.provider-override` 项目 Provider；
+4. Provider `boot()`；
+5. 旧 `config/boot.php`。
 
-Installer 的 `dryRun=true` 调用只能返回差异，不得写项目文件；正式 `install()`、`refresh()`、`upgrade()`、`uninstall()` 必须各自保证幂等和操作内失败回滚。命令层会先完成全量预检，并且只在 `install()` 成功后写入 Module 启用状态。
+项目 Provider 因此保留最终容器覆盖权。
 
-Provider 注册顺序为 Module Provider、旧 `config/singleton.php` 兼容绑定、`module.provider-override` 项目 Provider；随后依次执行 Provider `boot()`，最后执行旧 `config/boot.php`。项目 Provider 因此保留最终容器覆盖权，不替换或跳过 Module Provider。
+### Module Helper
 
-## 全局异常上报与 rescue
+framework 只保留核心函数：
 
-框架提供只上报、不生成响应的 `report()`，以及用于显式容错的通用 `rescue()`：
+- `app`
+- `config`
+- `env`
+- `report`
+- `rescue`
 
-```php
-$result = rescue(
-    static fn () => $service->runOptionalOperation(),
-    fallback: false,
-);
+其他全局函数由已启用 Module 的 `config/helpers.php` 声明。`HelperLoader` 负责所有权校验、
+冲突检测和文件加载；未启用 Module 的 helper 不进入全局命名空间。
+
+例如 `event()` 归 `hongxunpan/simple-event` 所有，只有安装并启用 Event Module 后才存在。
+
+### 可选基础设施
+
+按项目需要分别安装：
+
+```bash
+composer require hongxunpan/simple-redis
+composer require hongxunpan/simple-event
+composer require hongxunpan/simple-eloquent
 ```
 
-callback 成功时返回原结果；失败时默认通过 `ExceptionReporter` 上报原异常，再返回固定 fallback 或执行 fallback callable。也可以使用 `report: false` 或判断 callable 控制是否上报。
+安装 Composer 包不会自动启用 Module。安装后使用：
 
-业务仓可以在 `config/singleton.php` 覆盖默认上报器：
-
-```php
-use App\Exceptions\BusinessExceptionReporter;
-use HongXunPan\Framework\Exceptions\ExceptionReporter;
-
-return [
-    ExceptionReporter::class => BusinessExceptionReporter::class,
-];
+```bash
+php bin/simple module:enable redis
+php bin/simple module:enable event
+php bin/simple module:enable eloquent
 ```
 
-`rescue()` 会捕获 `Throwable`，只应包裹业务已经明确允许失败的旁路操作。关键写入、配置校验和默认 Event 发布仍应让异常向上传播。
+具体配置、公开契约和 Worker 使用方式由对应包 README 维护。
 
-Event 配置、发布与消费异常统一继承 `HongXunPan\Framework\Event\Exception\EventException`，业务仓可以基于该公共异常族设置独立日志 Channel 或告警策略，不需要逐个枚举具体异常类。
+## 原子文件操作
 
-## 业务事件 MVP
+`HongXunPan\Framework\Filesystem\AtomicFile` 提供：
 
-当前 Event 内核支持：
+- `read()`：读取文件并将失败转为明确异常；
+- `replace()`：在目标目录内原子替换文件；
+- `create()`：原子创建且不覆盖已有文件。
 
-- 同步 listener；
-- Redis Streams 异步 listener；
-- 显式 best-effort listener 失败策略；
-- Symfony JSON 持久化协议；
-- Consumer Group、pending 回收和 failed stream；
-- 一个 Event 对应一条异步消息，消息内冻结全部异步 listener。
-
-当前不提供 Database Outbox、自动重试、延迟任务、多 Driver 选择、长期执行历史或 exactly-once。
-
-### 1. 定义 Event
-
-Event 是已经发生的业务事实快照，不携带 ORM Model、Request、Service 或基础设施配置。
-
-```php
-<?php
-
-use DateTimeImmutable;
-use HongXunPan\Framework\Event\Event;
-
-final readonly class AlumniCardApproved implements Event
-{
-    public const int VERSION = 1;
-
-    public function __construct(
-        public int $alumniCardId,
-        public int $userId,
-        public DateTimeImmutable $approvedAt,
-    ) {
-    }
-}
-```
-
-MVP 快照字段只允许标量、`null`、`BackedEnum` 和 `DateTimeImmutable`。Event 类必须声明为 `final readonly`，构造参数必须与公开属性一一对应。
-
-### 2. 定义 listener
-
-普通 listener 同步执行：
-
-```php
-final class WriteApprovalAuditLog
-{
-    public function handle(AlumniCardApproved $event): void
-    {
-        // 写入审计事实。
-    }
-}
-```
-
-实现 `ShouldQueue` 的 listener 进入全局异步 Driver：
-
-```php
-use HongXunPan\Framework\Event\Listener\ShouldQueue;
-
-final class SendApprovalNotification implements ShouldQueue
-{
-    public function handle(AlumniCardApproved $event): void
-    {
-        // 异步副作用必须按业务唯一事实保证幂等。
-    }
-}
-```
-
-listener 必须声明公开实例方法 `handle(具体 Event $event): void`。单个 Event 和 listener 均不配置 driver、channel、stream 或重试参数。
-
-对不应污染业务调用链的非关键副作用，显式实现 `ShouldHandleBestEffort`：
-
-```php
-use HongXunPan\Framework\Event\Listener\ShouldHandleBestEffort;
-use HongXunPan\Framework\Event\Listener\ShouldQueue;
-
-final class SendApprovalNotification implements ShouldQueue, ShouldHandleBestEffort
-{
-    public function handle(AlumniCardApproved $event): void
-    {
-        // 异常会被上报，但不会让同步调用失败或让异步消息进入失败流。
-    }
-}
-```
-
-普通同步 listener 仍保持异常向上传播；普通异步 listener 失败仍进入 failed stream。best-effort 只改变显式 marker listener 的失败策略：同步阶段继续后续 listener，异步阶段完成上报后 ACK。
-
-框架默认使用 `ErrorLogListenerFailureReporter` 输出已清洗的 listener、Event 和异常摘要。业务仓可以在 `config/singleton.php` 绑定自己的 `ListenerFailureReporter` 实现；失败上报器自身异常也不会污染业务调用链。
-
-### 3. 配置 Event
-
-`config/events.php`：
-
-```php
-<?php
-
-use HongXunPan\Framework\Event\Driver\RedisStreamDriver;
-
-return [
-    'driver' => [
-        'class' => RedisStreamDriver::class,
-        'connection' => 'default',
-        'stream' => 'simple-framework:business-events',
-        'group' => 'simple-framework',
-        'failed_stream' => 'simple-framework:business-events:failed',
-        'block_ms' => 5000,
-        'batch_size' => 10,
-        'claim_idle_ms' => 60000,
-        'failed_max_length' => 10000,
-    ],
-    'listeners' => [
-        AlumniCardApproved::class => [
-            WriteApprovalAuditLog::class,
-            SendApprovalNotification::class,
-        ],
-    ],
-];
-```
-
-没有任何 `ShouldQueue` listener 时可以省略 `driver`。一旦存在异步 listener，driver 配置缺失或不合法会在启动期失败。
-
-### 4. 启动 Event
-
-在业务仓 `config/boot.php` 中显式启动，并保证 Redis connection 先完成初始化：
-
-```php
-<?php
-
-use HongXunPan\Framework\Event\Bootstrap\EventBootstrapper;
-
-return [
-    [App\BootConfigService::class, 'setRedisConnection'],
-    [EventBootstrapper::class, 'boot'],
-];
-```
-
-### 5. 触发 Event
-
-```php
-event(new AlumniCardApproved(
-    alumniCardId: 1,
-    userId: 10001,
-    approvedAt: new DateTimeImmutable(),
-));
-```
-
-触发端不区分同步或异步。同步 listener 全部成功后，Dispatcher 才发布包含全部异步 listener 的唯一 EventMessage。
-
-MVP 没有事务协调器。涉及数据库事务时，应在事务成功返回后调用 `event(...)`；数据库提交后、Redis 发布前仍存在已接受的丢失窗口。
-
-### 6. 运行 Worker
-
-框架提供：
-
-```php
-$processed = app(HongXunPan\Framework\Event\Worker\EventWorker::class)->runOnce();
-```
-
-持续运行时使用 `EventWorker::run(callable $shouldStop)`。信号注册、命令退出码和 Supervisor/systemd 配置由业务仓负责，框架不硬依赖 `pcntl`。
-
-Redis Streams 消费语义为 at-least-once。Worker 崩溃或 ACK 前退出时，整条 Event 消息可能重新执行，因此所有异步 listener 必须幂等。
+调用方负责目录创建、路径边界和上层幂等策略。
 
 ## 验证
 
@@ -281,4 +199,4 @@ Redis Streams 消费语义为 at-least-once。Worker 崩溃或 ACK 前退出时�
 composer test
 ```
 
-共享工作区中的 `php85 / 0.2.x` 版本线应使用 PHP 8.5 对应容器执行验证。
+共享工作区中的 `0.3.x` 开发线必须使用 `gplus-php-fpm-8.5` 执行验证。
