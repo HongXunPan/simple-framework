@@ -1,0 +1,32 @@
+name: PHP 8.5
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 PHP 与 Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      - name: 安装依赖
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: 校验 Composer 配置
+        run: composer validate --strict --no-interaction
+
+      - name: 运行回归测试
+        run: composer test --no-interaction
