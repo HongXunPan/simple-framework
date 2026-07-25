@@ -136,6 +136,38 @@ $runConfigEnv('Application 无 env 文件也能初始化', static function () us
     }
 });
 
+$runConfigEnv('Application 使用 APP_ENV 与 APP_DEBUG', static function () use ($configEnvAssertSame): void {
+    $application = new Application();
+    $application->instance(Env::class, Env::fromArray([
+        'APP_ENV' => 'local',
+        'APP_DEBUG' => true,
+    ]));
+    $application->instance(Config::class, Config::fromArray([
+        'app' => ['timezone' => 'Asia/Shanghai'],
+        'module' => ['enable' => [], 'provider-override' => []],
+    ]));
+    $application->init('/tmp/simple-framework-config-env-app-keys');
+
+    $configEnvAssertSame('local', $application->environment, 'APP_ENV 未生效');
+    $configEnvAssertSame(true, $application->isDebug, 'APP_DEBUG 未生效');
+});
+
+$runConfigEnv('Application 忽略旧环境与配置键', static function () use ($configEnvAssertSame): void {
+    $application = new Application();
+    $application->instance(Env::class, Env::fromArray([
+        'ENV_NAME' => 'local',
+        'DEBUG' => true,
+    ]));
+    $application->instance(Config::class, Config::fromArray([
+        'app' => ['is_debug' => true, 'timezone' => 'Asia/Shanghai'],
+        'module' => ['enable' => [], 'provider-override' => []],
+    ]));
+    $application->init('/tmp/simple-framework-config-env-legacy-keys');
+
+    $configEnvAssertSame('production', $application->environment, '旧 ENV_NAME 不应影响运行环境');
+    $configEnvAssertSame(false, $application->isDebug, '旧 DEBUG / app.is_debug 不应影响调试状态');
+});
+
 if ($configEnvFailures !== []) {
     foreach ($configEnvFailures as $failure) {
         fwrite(STDERR, $failure . PHP_EOL);

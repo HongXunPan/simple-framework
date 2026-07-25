@@ -72,11 +72,11 @@ class Application extends Container
             $this->instance(Env::class, new Env($this->getPath('base') . '.env'));
         }
         $env = $this->make(Env::class);
-        $this->environment = (string) $env->get('APP_ENV', $env->get('ENV_NAME', 'production'));
-        $this->isDebug = (bool) $env->get('APP_DEBUG', $env->get('DEBUG', false));
+        $this->environment = (string) $env->get('APP_ENV', 'production');
+        $this->isDebug = (bool) $env->get('APP_DEBUG', false);
         $this->loadConfig($this, !$this->isDebug);
         $this->environment = (string) config('app.env', $this->environment);
-        $this->isDebug = (bool) config('app.debug', config('app.is_debug', $this->isDebug));
+        $this->isDebug = (bool) config('app.debug', $this->isDebug);
         ini_set(
             'display_errors',
             $this->environment === 'local' && $this->isDebug ? 'On' : 'Off',

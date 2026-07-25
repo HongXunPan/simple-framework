@@ -42,8 +42,8 @@ $timezone = config('app.timezone', 'UTC');
 - `.env` 不存在时使用调用方默认值；
 - 配置支持点号路径；
 - 非调试环境可以生成原子配置缓存；
-- `APP_ENV`、`APP_DEBUG` 是推荐环境键；
-- 兼容期继续读取 `ENV_NAME`、`DEBUG`；
+- 运行环境只读取 `APP_ENV`、`APP_DEBUG`；
+- 旧键 `ENV_NAME`、`DEBUG` 与旧配置键 `app.is_debug` 不再支持；
 - 不再回退到 `hongxunpan/php-tools` 的旧 Config / Env。
 
 `config()` 与 `env()` 依赖当前 `Application` 中的核心绑定。脱离应用启动流程的脚本应显式创建

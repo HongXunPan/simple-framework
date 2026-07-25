@@ -48,7 +48,7 @@ function bootHelperApplication(bool $customReporter = false): Application
 
     $application = new Application();
     Application::setInstance($application);
-    $application->instance(Env::class, Env::fromArray(['DEBUG' => false]));
+    $application->instance(Env::class, Env::fromArray(['APP_DEBUG' => false]));
     $application->instance(Config::class, Config::fromArray($config));
     $application->init('/tmp/simple-framework-helper-tests');
 
