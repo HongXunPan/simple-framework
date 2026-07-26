@@ -1,9 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace HongXunPan\Framework\Route;
 
 use Closure;
 use HongXunPan\Framework\Core\SingletonAbstract;
+use HongXunPan\Framework\Filesystem\AtomicFile;
+use RuntimeException;
 use function Opis\Closure\serialize as opis_serialize;
 use function Opis\Closure\unserialize as opis_unserialize;
 
@@ -86,19 +90,27 @@ class Route extends SingletonAbstract
         }
     }
 
-    public static function cache($dir, $fileName = 'route.php'): void
+    public static function clear(): void
     {
-        $routeList = self::getInstance()->routeList;
-        if (!file_exists($dir)) {
-            mkdir($dir);
-        }
-        $file = $dir . '/' . $fileName;
-        file_put_contents($file, opis_serialize($routeList));
+        self::getInstance()->routeList = [];
     }
 
-    public static function loadCache($file): void
+    public static function cache(string $dir, string $fileName = 'route.php'): void
     {
-        $cache = opis_unserialize(file_get_contents($file));
+        $routeList = self::getInstance()->routeList;
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+            throw new RuntimeException('路由缓存目录创建失败：' . $dir);
+        }
+        $file = rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $fileName;
+        AtomicFile::replace($file, opis_serialize($routeList), 0644);
+    }
+
+    public static function loadCache(string $file): void
+    {
+        $cache = opis_unserialize(AtomicFile::read($file));
+        if (!is_array($cache)) {
+            throw new RuntimeException('路由缓存必须解析为数组：' . $file);
+        }
         self::getInstance()->routeList = $cache;
     }
 }

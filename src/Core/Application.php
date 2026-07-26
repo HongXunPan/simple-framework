@@ -4,6 +4,7 @@ namespace HongXunPan\Framework\Core;
 
 use Closure;
 use HongXunPan\Framework\Config\Env;
+use HongXunPan\Framework\Config\Config;
 use HongXunPan\Framework\Exceptions\ErrorLogExceptionReporter;
 use HongXunPan\Framework\Exceptions\ErrorHandler;
 use HongXunPan\Framework\Exceptions\ExceptionRenderer;
@@ -14,7 +15,6 @@ use HongXunPan\Framework\Lifecycle\ExceptionOccurredSnapshot;
 use HongXunPan\Framework\Lifecycle\NullApplicationLifecycle;
 use HongXunPan\Framework\Lifecycle\RequestHandledSnapshot;
 use HongXunPan\Framework\Module\HelperLoader;
-use HongXunPan\Framework\Module\ModuleConfig;
 use HongXunPan\Framework\Module\ModuleLoader;
 use HongXunPan\Framework\Response\Response;
 use HongXunPan\Framework\Response\ResponseContract;
@@ -110,18 +110,13 @@ class Application extends Container
 
     private function bootProviders(): void
     {
-        $this->singletonIf(
-            ModuleConfig::class,
-            static fn (Application $app): ModuleConfig =>
-                new ModuleConfig($app->getPath('base')),
-        );
         $this->singletonIf(HelperLoader::class);
         $this->singletonIf(
             ModuleLoader::class,
             static fn (Application $app): ModuleLoader =>
                 new ModuleLoader(
                     $app,
-                    $app->make(ModuleConfig::class),
+                    $app->make(Config::class),
                     $app->make(HelperLoader::class),
                 ),
         );
@@ -140,22 +135,25 @@ class Application extends Container
 
     public function loadRoute(): void
     {
-        $cachePath = $this->getPath('base', 'bootstrap/cache');
-        $cacheFile = 'routes.php';
-        if (file_exists($cachePath . $cacheFile)) {
-            if (!$this->isDebug) {
-                Route::loadCache($cachePath . $cacheFile);
-                return;
-            }
+        $cacheFile = $this->getPath('base', 'bootstrap/cache') . 'routes.php';
+        if (!$this->isDebug && is_file($cacheFile)) {
+            Route::loadCache($cacheFile);
+            return;
         }
 
-        $routeFiles = glob($this->getPath('base', 'routes') . '*.php');
-        foreach ($routeFiles as $file) {
-            require_once $file;
-            if (!app()->isDebug) {
-                Route::cache($cachePath, 'routes.php');
-            }
-        }
+        $this->loadRouteFiles();
+    }
+
+    public function cacheRoutes(): void
+    {
+        $this->loadRouteFiles();
+        Route::cache($this->getPath('base', 'bootstrap/cache'), 'routes.php');
+    }
+
+    private function loadRouteFiles(): void
+    {
+        Route::clear();
+        Route::loadAllRouteByFile($this->getPath('base', 'routes'));
     }
 
     public function setResponse($content): static

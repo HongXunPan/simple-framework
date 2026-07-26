@@ -41,7 +41,7 @@ $timezone = config('app.timezone', 'UTC');
 - 进程环境变量优先于项目 `.env`；
 - `.env` 不存在时使用调用方默认值；
 - 配置支持点号路径；
-- 非调试环境可以生成原子配置缓存；
+- 非调试环境优先读取已有配置缓存，缓存缺失时只回退源码且不在运行时补写；
 - 运行环境只读取 `APP_ENV`、`APP_DEBUG`；
 - 旧键 `ENV_NAME`、`DEBUG` 与旧配置键 `app.is_debug` 不再支持；
 - 不再回退到 `hongxunpan/php-tools` 的旧 Config / Env。
@@ -145,6 +145,10 @@ php bin/simple module:publish <name> <resource>
 所有变更命令支持 `--dry-run`。Module 命令使用不执行 Composer `autoload.files` 的受限类加载，
 因此 Installer 和资源声明不得依赖全局帮助函数。
 
+运行时的 `module.enable` 与 `module.provider-override` 统一由核心 `Config` 读取；`ModuleConfig`
+只在 CLI 阶段原子维护项目 `config/module.php`。Module 状态或发布资源实际变更后，会同时失效
+配置缓存与路由缓存。
+
 Provider 顺序为：
 
 1. framework 默认绑定；
@@ -188,6 +192,33 @@ php bin/simple module:enable eloquent
 ```
 
 具体配置、公开契约和 Worker 使用方式由对应包 README 维护。
+
+## 启动缓存
+
+framework 只管理项目目录中的两个启动缓存：
+
+```text
+bootstrap/cache/config.php
+bootstrap/cache/routes.php
+```
+
+缓存是可选加速层，不是真相源。应用运行时只读取已有缓存；任一缓存缺失时从项目
+`config/*.php` 或 `routes/*.php` 读取，不自动生成或删除缓存。
+
+显式命令：
+
+```bash
+php bin/simple bootstrap:clear
+php bin/simple bootstrap:cache
+```
+
+`bootstrap:clear` 幂等删除两个已登记缓存；`bootstrap:cache` 先清理旧缓存，再使用源码配置
+启动应用并生成配置缓存与最终路由缓存。两个文件均通过 `AtomicFile` 原子替换并设置为
+`0644`，缺少缓存目录时按 `0755` 创建。
+
+Module 命令继续使用受限类加载；只有 `bootstrap:cache` 会加载 Composer `autoload.files`，
+以便项目配置、Provider 和路由可使用正常运行时 Helper。Composer 安装或更新阶段只应先刷新
+Module 再清理启动缓存，生产缓存由部署流程在环境就绪后显式构建。
 
 ## 原子文件操作
 

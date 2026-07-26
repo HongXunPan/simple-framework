@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HongXunPan\Framework\Module;
 
+use HongXunPan\Framework\Bootstrap\BootstrapCache;
 use HongXunPan\Framework\Filesystem\AtomicFile;
 use HongXunPan\Framework\Module\Exception\ModuleException;
 use RuntimeException;
@@ -99,9 +100,14 @@ final class ModuleConfig
             );
         }
 
-        $cacheFile = $this->projectPath . DIRECTORY_SEPARATOR . 'bootstrap/cache/config.php';
-        if (is_file($cacheFile) && !unlink($cacheFile)) {
-            throw new ModuleException('Module 配置已更新，但配置缓存清理失败：' . $cacheFile);
+        try {
+            (new BootstrapCache($this->projectPath))->clear();
+        } catch (RuntimeException $exception) {
+            throw new ModuleException(
+                'Module 配置已更新，但启动缓存清理失败：' . $exception->getMessage(),
+                0,
+                $exception,
+            );
         }
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HongXunPan\Framework\Module\Command;
 
+use HongXunPan\Framework\Bootstrap\BootstrapCache;
 use HongXunPan\Framework\Console\Output;
 use HongXunPan\Framework\Module\Exception\ModuleException;
 use HongXunPan\Framework\Module\ModuleConfig;
@@ -44,7 +45,7 @@ final class ModuleCommandRunner
                 $positionals[] = $argument;
             }
 
-            return match ($name) {
+            $result = match ($name) {
                 'module:enable' => $this->enable($positionals, $dryRun),
                 'module:refresh' => $this->refresh($positionals, $dryRun),
                 'module:disable' => $this->disable($positionals, $dryRun),
@@ -53,6 +54,18 @@ final class ModuleCommandRunner
                 'help', '--help', '-h' => $this->help(),
                 default => throw new ModuleException("未知命令：{$name}"),
             };
+            if ($result === 0
+                && !$dryRun
+                && in_array($name, [
+                    'module:enable',
+                    'module:refresh',
+                    'module:disable',
+                    'module:publish',
+                ], true)) {
+                (new BootstrapCache($this->projectPath))->clear();
+            }
+
+            return $result;
         } catch (Throwable $throwable) {
             $this->output->error('[错误] ' . $throwable->getMessage());
             return 1;

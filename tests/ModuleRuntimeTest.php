@@ -219,6 +219,7 @@ $runModuleRuntime('ModuleConfig 原子维护启用状态、保留项目覆盖并
     try {
         writeModuleRuntimeProject($directory, [RuntimeProjectServiceProvider::class]);
         file_put_contents($directory . '/bootstrap/cache/config.php', '<?php return [];');
+        file_put_contents($directory . '/bootstrap/cache/routes.php', 'routes');
         $config = new ModuleConfig($directory);
 
         $moduleRuntimeAssertTrue($config->add(RuntimeModule::class), '首次启用没有写入配置');
@@ -226,10 +227,48 @@ $runModuleRuntime('ModuleConfig 原子维护启用状态、保留项目覆盖并
         $moduleConfiguration = require $directory . '/config/module.php';
         $moduleRuntimeAssertSame([RuntimeProjectServiceProvider::class], $moduleConfiguration['provider-override'], '更新启用状态时丢失了项目 Provider 覆盖配置');
         $moduleRuntimeAssertTrue(!is_file($directory . '/bootstrap/cache/config.php'), '配置缓存未清理');
+        $moduleRuntimeAssertTrue(!is_file($directory . '/bootstrap/cache/routes.php'), '路由缓存未清理');
         $moduleRuntimeAssertSame(false, $config->add(RuntimeModule::class), '重复启用不幂等');
         $moduleRuntimeAssertTrue($config->remove(RuntimeModule::class), 'Module 禁用没有更新配置');
         $moduleRuntimeAssertSame([], $config->enabled(), 'Module 禁用状态错误');
         $moduleRuntimeAssertSame(false, $config->remove(RuntimeModule::class), '重复禁用不幂等');
+    } finally {
+        removeModuleRuntimeDirectory($directory);
+    }
+});
+
+$runModuleRuntime('ModuleLoader 从 Config 读取启用状态与项目 Provider', static function () use (
+    $moduleRuntimeAssertSame,
+): void {
+    $directory = moduleRuntimeTemporaryDirectory();
+    try {
+        ModuleRuntimeState::reset();
+        writeModuleRuntimeProject($directory, [RuntimeProjectServiceProvider::class]);
+        $modulePath = $directory . '/modules/runtime-cache';
+        writeRuntimeModule($modulePath, [RuntimeModuleServiceProvider::class]);
+        RuntimeModule::$path = $modulePath;
+        (new ModuleConfig($directory))->add(RuntimeModule::class);
+
+        $config = new \HongXunPan\Framework\Config\Config(
+            $directory . '/config',
+            $directory . '/bootstrap/cache',
+            false,
+        );
+        $config->cache();
+        file_put_contents(
+            $directory . '/config/module.php',
+            "<?php return ['enable' => [], 'provider-override' => []];\n",
+        );
+
+        $application = new Application();
+        $application->init($directory);
+
+        $moduleRuntimeAssertSame('project', $application->make('module.runtime.value'), '运行时未使用缓存中的 Module 配置');
+        $moduleRuntimeAssertSame(
+            ['module-register', 'project-register', 'module-boot', 'project-boot'],
+            ModuleRuntimeState::$steps,
+            '缓存 Module 配置对应的 Provider 顺序错误',
+        );
     } finally {
         removeModuleRuntimeDirectory($directory);
     }

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Composer\Autoload\ClassLoader;
-use HongXunPan\Framework\Module\Command\ModuleCommandRunner;
+use HongXunPan\Framework\Console\CommandRunner;
 
 $projectPath = isset($projectPath) && is_string($projectPath)
     ? rtrim($projectPath, DIRECTORY_SEPARATOR)
@@ -13,7 +13,7 @@ if (!is_string($projectPath) || $projectPath === '') {
     return 1;
 }
 if (PHP_VERSION_ID < 80500) {
-    fwrite(STDERR, '[错误] Simple Module 命令要求 PHP 8.5 或更高版本' . PHP_EOL);
+    fwrite(STDERR, '[错误] Simple 命令要求 PHP 8.5 或更高版本' . PHP_EOL);
     return 1;
 }
 
@@ -35,5 +35,18 @@ foreach (require $composerPath . '/autoload_namespaces.php' as $prefix => $paths
 $loader->addClassMap(require $composerPath . '/autoload_classmap.php');
 $loader->register(true);
 
+$arguments = $argv ?? [];
+$command = $arguments[1] ?? 'help';
+if ($command === 'bootstrap:cache') {
+    $autoloadFiles = require $composerPath . '/autoload_files.php';
+    if (!is_array($autoloadFiles)) {
+        fwrite(STDERR, '[错误] Composer autoload_files.php 格式错误' . PHP_EOL);
+        return 1;
+    }
+    foreach ($autoloadFiles as $autoloadFile) {
+        require_once $autoloadFile;
+    }
+}
+
 // Module 命令故意不加载 autoload_files.php，给 Installer 保留自动加载前处理窗口。
-return (new ModuleCommandRunner($projectPath))->run($argv ?? []);
+return (new CommandRunner($projectPath))->run($arguments);

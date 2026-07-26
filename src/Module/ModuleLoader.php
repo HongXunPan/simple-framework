@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HongXunPan\Framework\Module;
 
+use HongXunPan\Framework\Config\Config;
 use HongXunPan\Framework\Core\Application;
 use HongXunPan\Framework\Module\Exception\ModuleException;
 use HongXunPan\Framework\Provider\ServiceProvider;
@@ -22,7 +23,7 @@ final class ModuleLoader
 
     public function __construct(
         private readonly Application $app,
-        private readonly ModuleConfig $config,
+        private readonly Config $config,
         private readonly HelperLoader $helpers,
     ) {
     }
@@ -34,7 +35,7 @@ final class ModuleLoader
         }
 
         $modules = [];
-        foreach ($this->config->enabled() as $moduleClass) {
+        foreach ($this->enabledClasses() as $moduleClass) {
             if (!class_exists($moduleClass)) {
                 throw new ModuleException("已启用 Module 不存在，请先恢复 Composer 依赖：{$moduleClass}");
             }
@@ -57,6 +58,31 @@ final class ModuleLoader
         }
 
         $this->modulesRegistered = true;
+    }
+
+    /**
+     * @return list<class-string<Module>>
+     */
+    private function enabledClasses(): array
+    {
+        $classes = $this->config->get('module.enable', []);
+        if (!is_array($classes) || !array_is_list($classes)) {
+            throw new ModuleException("config('module.enable') 必须是 Module 类名列表");
+        }
+
+        $enabled = [];
+        foreach ($classes as $class) {
+            if (!is_string($class) || $class === '') {
+                throw new ModuleException("config('module.enable') 只能包含 Module 类名");
+            }
+            $class = ltrim($class, '\\');
+            if (isset($enabled[$class])) {
+                throw new ModuleException("config('module.enable') 存在重复类名：{$class}");
+            }
+            $enabled[$class] = true;
+        }
+
+        return array_keys($enabled);
     }
 
     /**

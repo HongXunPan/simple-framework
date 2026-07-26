@@ -6,6 +6,7 @@ require __DIR__ . '/HelperTest.php';
 require __DIR__ . '/ResponseBindingTest.php';
 require __DIR__ . '/ConfigEnvTest.php';
 require __DIR__ . '/FilesystemTest.php';
+require __DIR__ . '/BootstrapCacheTest.php';
 require __DIR__ . '/ModuleRuntimeTest.php';
 require __DIR__ . '/ModuleCommandTest.php';
 require __DIR__ . '/ModulePublishTest.php';

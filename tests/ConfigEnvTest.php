@@ -93,7 +93,7 @@ $runConfigEnv('Config 支持点号读取与默认值', static function () use ($
     $configEnvAssertSame('fallback', $config->get('app.missing.value', 'fallback'), 'Config 默认值失败');
 });
 
-$runConfigEnv('Config 使用原子缓存并复用缓存内容', static function () use (
+$runConfigEnv('Config 运行时不写缓存且显式缓存可复用', static function () use (
     $configEnvAssertSame,
     $configEnvAssertTrue,
 ): void {
@@ -106,11 +106,19 @@ $runConfigEnv('Config 使用原子缓存并复用缓存内容', static function 
 
         $config = new Config($configPath, $cachePath, true);
         $configEnvAssertSame('first', $config->get('app.name'), '首次配置加载失败');
+        $configEnvAssertTrue(!is_file($cachePath . '/config.php'), '运行时自动生成了配置缓存');
+
+        $config->cache();
         $configEnvAssertTrue(is_file($cachePath . '/config.php'), '配置缓存未生成');
+        $configEnvAssertSame(0644, fileperms($cachePath . '/config.php') & 0777, '配置缓存权限错误');
 
         file_put_contents($configPath . '/app.php', "<?php return ['name' => 'second'];\n");
         $cached = new Config($configPath, $cachePath, true);
         $configEnvAssertSame('first', $cached->get('app.name'), '未优先使用已有配置缓存');
+
+        $uncached = new Config($configPath, $cachePath, false);
+        $configEnvAssertSame('second', $uncached->get('app.name'), '禁用缓存后未读取源码配置');
+        $configEnvAssertTrue(is_file($cachePath . '/config.php'), '运行时删除了已有配置缓存');
         $configEnvAssertSame([], glob($cachePath . '/.atomic-*') ?: [], '遗留配置缓存临时文件');
     } finally {
         removeConfigEnvDirectory($directory);

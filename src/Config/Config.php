@@ -52,19 +52,20 @@ final class Config
             return;
         }
 
-        $files = glob(rtrim($this->configPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '*.php') ?: [];
-        sort($files);
-        foreach ($files as $file) {
-            $this->items[pathinfo($file, PATHINFO_FILENAME)] = $this->requireArray($file, '配置文件');
-        }
-
-        if ($this->cacheEnabled && $cacheFile !== '') {
-            $this->writeCache($cacheFile);
-        } elseif ($cacheFile !== '' && is_file($cacheFile)) {
-            @unlink($cacheFile);
-        }
-
+        $this->items = $this->loadFiles();
         $this->loaded = true;
+    }
+
+    public function cache(): void
+    {
+        $cacheFile = $this->cacheFile();
+        if ($this->configPath === '' || $cacheFile === '') {
+            throw new RuntimeException('配置目录和缓存目录不能为空');
+        }
+
+        $this->items = $this->loadFiles();
+        $this->loaded = true;
+        $this->writeCache($cacheFile);
     }
 
     public function get(string $key = '', mixed $default = ''): mixed
@@ -98,6 +99,21 @@ final class Config
         return $value;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function loadFiles(): array
+    {
+        $items = [];
+        $files = glob(rtrim($this->configPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '*.php') ?: [];
+        sort($files);
+        foreach ($files as $file) {
+            $items[pathinfo($file, PATHINFO_FILENAME)] = $this->requireArray($file, '配置文件');
+        }
+
+        return $items;
+    }
+
     private function cacheFile(): string
     {
         if ($this->cachePath === '') {
@@ -115,6 +131,6 @@ final class Config
         }
 
         $content = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($this->items, true) . ";\n";
-        AtomicFile::replace($cacheFile, $content);
+        AtomicFile::replace($cacheFile, $content, 0644);
     }
 }
